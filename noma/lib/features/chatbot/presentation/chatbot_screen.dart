@@ -4,12 +4,18 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/ai_key_setup_modal.dart';
 import '../../../shared/widgets/ai_thinking_widget.dart';
+import '../../../shared/widgets/bouncy_tap.dart';
 import '../../../shared/widgets/glass_card.dart';
 import 'providers/chatbot_provider.dart';
 import 'widgets/chat_bubble.dart';
 
 class ChatbotScreen extends ConsumerStatefulWidget {
-  const ChatbotScreen({super.key});
+  final bool isTabPage;
+
+  const ChatbotScreen({
+    super.key,
+    this.isTabPage = false,
+  });
 
   @override
   ConsumerState<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -47,28 +53,38 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(chatbotControllerProvider, (prev, next) {
+    ref.listen<AsyncValue<void>>(chatbotControllerProvider, (prev, next) {
       if (next.hasError && !next.isLoading) {
-        final errorMsg = next.error.toString().replaceAll('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: AppColors.expense,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final errorMsg = (next.error ?? '').toString().replaceAll('Exception: ', '');
+        if (errorMsg.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: AppColors.expense,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
 
-        if (errorMsg.contains('API Key') || errorMsg.contains('API_KEY_INVALID')) {
-          AiKeySetupModal.show(context);
+          if (errorMsg.contains('API Key') || errorMsg.contains('API_KEY_INVALID') || errorMsg.contains('invalid_api_key')) {
+            AiKeySetupModal.show(context);
+          }
         }
       }
     });
 
     final messagesAsync = ref.watch(chatMessagesStreamProvider);
     final controllerState = ref.watch(chatbotControllerProvider);
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final isKeyboardActive = keyboardHeight > 0;
+
+    final bottomMargin = widget.isTabPage
+        ? (isKeyboardActive ? keyboardHeight + 12.0 : 88.0 + mediaQuery.padding.bottom)
+        : (isKeyboardActive ? keyboardHeight + 12.0 : 16.0 + mediaQuery.padding.bottom);
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Row(
           children: [
@@ -77,10 +93,13 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             Text('Nomi — Asisten AI', style: AppTypography.headingMedium),
           ],
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: !widget.isTabPage,
+        leading: widget.isTabPage
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep_rounded, color: AppColors.textSecondary),
@@ -156,7 +175,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 16),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
@@ -186,49 +205,76 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
               ),
             ),
 
-          // Bottom Input Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: AppColors.backgroundSecondary,
-              border: Border(top: BorderSide(color: AppColors.glassBorder)),
+          // Floating Glassmorphic Input Bar
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            margin: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 8,
+              bottom: bottomMargin,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GlassCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    borderRadius: 24,
+            child: GlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              borderRadius: 28,
+              backgroundColor: AppColors.backgroundSecondary.withValues(alpha: 0.9),
+              borderColor: AppColors.glassBorder,
+              shadows: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              child: Row(
+                children: [
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
                     child: TextField(
                       controller: _controller,
                       style: AppTypography.bodyMedium,
                       decoration: const InputDecoration(
                         hintText: 'Tanyakan sesuatu pada Nomi AI...',
-                        hintStyle: TextStyle(color: AppColors.textMuted),
+                        hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
                         border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                InkWell(
-                  onTap: controllerState.isLoading ? null : _send,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
+                  const SizedBox(width: 8),
+                  BouncyTap(
+                    onTap: controllerState.isLoading ? null : _send,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

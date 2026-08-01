@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/bouncy_tap.dart';
 import '../../../shared/widgets/glass_reflection_background.dart';
 import '../../chatbot/presentation/chatbot_screen.dart';
 import '../../home/presentation/home_screen.dart';
-import '../../receipt_scanner/presentation/scanner_screen.dart';
 import '../../report/presentation/report_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 
@@ -30,8 +28,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   final List<Widget> _pages = const [
     HomeScreen(),
-    ChatbotScreen(),
-    ScannerScreen(),
+    ChatbotScreen(isTabPage: true),
     ReportScreen(),
     SettingsScreen(),
   ];
@@ -63,25 +60,36 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: false,
       body: GlassReflectionBackground(
         child: Stack(
           children: [
-            // Smooth Animated Page Transition
+            // Smooth Animated Page Transition with Horizontal Swipe Support
             PageView(
               controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(), // Controlled via bottom navbar
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (index) {
+                if (_currentIndex != index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                }
+              },
               children: _pages,
             ),
 
-            // Floating Glassmorphic Ultra-Smooth Navigation Bar
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: _buildFloatingGlassNavBar(context),
-            ),
+            // Floating Navigation Bar (Hidden when soft keyboard is active to prevent overflow)
+            if (!isKeyboardOpen)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: _buildFloatingGlassNavBar(context),
+              ),
           ],
         ),
       ),
@@ -102,8 +110,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24.0, sigmaY: 24.0),
         child: Container(
-          height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: 68,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: AppColors.backgroundSecondary.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(28),
@@ -139,63 +147,43 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isSelected ? 14 : 10,
-                    vertical: 8,
-                  ),
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppColors.primary.withValues(alpha: 0.18)
+                        ? AppColors.primary.withValues(alpha: 0.2)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
+                    shape: BoxShape.circle,
                     border: Border.all(
                       color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.35)
+                          ? AppColors.primary.withValues(alpha: 0.45)
                           : Colors.transparent,
-                      width: 1.0,
+                      width: 1.2,
                     ),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              blurRadius: 12,
-                              spreadRadius: 0,
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                              blurRadius: 14,
+                              spreadRadius: 1,
                               offset: const Offset(0, 2),
                             ),
                           ]
                         : [],
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedScale(
-                        scale: isSelected ? 1.15 : 1.0,
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutBack,
-                        child: Icon(
-                          item['icon'] as IconData,
-                          size: 22,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textMuted,
-                        ),
+                  child: Center(
+                    child: AnimatedScale(
+                      scale: isSelected ? 1.18 : 1.0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutBack,
+                      child: Icon(
+                        item['icon'] as IconData,
+                        size: 23,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textMuted,
                       ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 250),
-                          opacity: isSelected ? 1.0 : 0.0,
-                          child: Text(
-                            item['label'] as String,
-                            style: AppTypography.caption.copyWith(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
               );

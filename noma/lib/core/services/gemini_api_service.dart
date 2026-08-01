@@ -25,8 +25,8 @@ class GeminiApiService {
   Future<String> _getApiKey() async {
     final rawKey = await ApiKeyService.getApiKey();
     final key = ApiKeyService.sanitizeKey(rawKey);
-    if (key.isEmpty || key == 'your_gemini_api_key_here') {
-      throw Exception('API Key Gemini belum diisi. Silakan masukkan API Key dari Google AI Studio pada menu Pengaturan.');
+    if (key.isEmpty || key == 'your_groq_api_key_here' || key == 'your_gemini_api_key_here') {
+      throw Exception('API Key Groq belum diisi. Silakan dapatkan API Key gratis dari console.groq.com pada menu Pengaturan.');
     }
     return key;
   }
@@ -50,14 +50,18 @@ class GeminiApiService {
           final errObj = data['error'];
           if (errObj is Map && errObj.containsKey('message')) {
             final msg = errObj['message'].toString();
-            if (msg.contains('API_KEY_INVALID') || msg.contains('API key not valid') || msg.contains('API key expired')) {
-              return 'API Key dari AI Studio tidak valid (API_KEY_INVALID). Silakan buat dan salin ulang API Key baru dari aistudio.google.com.';
+            if (msg.contains('API_KEY_INVALID') ||
+                msg.contains('API key not valid') ||
+                msg.contains('API key expired') ||
+                msg.contains('Invalid API Key') ||
+                msg.contains('invalid_api_key')) {
+              return 'API Key tidak valid ($msg). Silakan periksa atau ganti API Key Anda pada menu Pengaturan.';
             }
             if (msg.contains('User location is not supported')) {
-              return 'Lokasi/IP Anda tidak didukung oleh Google AI. Coba gunakan VPN atau ganti jaringan internet.';
+              return 'Lokasi/IP Anda tidak didukung oleh Groq AI. Coba gunakan jaringan internet lain.';
             }
             if (statusCode == 429 || msg.contains('Quota exceeded') || msg.contains('RESOURCE_EXHAUSTED')) {
-              return 'Batas kuota harian Gemini API tercapai (429 Too Many Requests). Silakan tunggu beberapa menit atau gunakan API Key baru.';
+              return 'Batas kuota Groq API tercapai (429 Too Many Requests). Silakan tunggu beberapa saat atau gunakan API Key baru.';
             }
             return msg;
           }
@@ -65,11 +69,11 @@ class GeminiApiService {
       } catch (_) {}
 
       if (statusCode == 400) {
-        return 'Format request atau API Key tidak sesuai (Status 400 Bad Request). Silakan periksa API Key Anda.';
+        return 'Format request atau API Key tidak sesuai (Status 400 Bad Request). Silakan periksa API Key Groq Anda.';
       } else if (statusCode == 403) {
-        return 'Akses ditolak oleh Google Gemini API (Status 403 Forbidden). Silakan periksa API Key Anda.';
+        return 'Akses ditolak oleh Groq Cloud API (Status 403 Forbidden). Silakan periksa API Key Anda.';
       } else if (statusCode == 429) {
-        return 'Kuota request Gemini API habis untuk sementara (Status 429).';
+        return 'Kuota request Groq API habis untuk sementara (Status 429).';
       }
     }
 
@@ -146,9 +150,14 @@ Catatan:
         }
       }
       throw Exception('Gagal mendapatkan respon dari Cloud AI');
+    } on DioException catch (e) {
+      throw Exception(_extractDioErrorMessage(e));
     } catch (e) {
-      debugPrint('Gemini Cloud API failed ($e). Falling back to Local AI Engine.');
-      return LocalAiEngine.parseNaturalText(text);
+      final err = e.toString().replaceAll('Exception: ', '');
+      if (err.contains('API Key') && err.contains('belum diisi')) {
+        return LocalAiEngine.parseNaturalText(text);
+      }
+      throw Exception(err);
     }
   }
 
@@ -180,6 +189,18 @@ Catatan:
 - Jika foto bukan struk belanja atau teks tidak dapat dibaca, kembalikan JSON: {"error": "Foto tidak dapat dibaca atau bukan struk belanja"}
 ''';
 
+    final geminiKey = await ApiKeyService.getGeminiApiKey();
+    final primaryKey = await _getApiKey();
+    final activeKey = geminiKey.isNotEmpty ? geminiKey : primaryKey;
+
+    if (activeKey.isEmpty) {
+      throw Exception('API Key belum diatur. Silakan atur API Key pada menu Pengaturan.');
+    }
+
+    if (activeKey.startsWith('gsk_')) {
+      throw Exception('Groq API Key (gsk_) hanya mendukung teks/chat. Pemindaian foto struk membutuhkan Gemini API Key gratis (teknologi Google Lens). Silakan masukkan Gemini API Key pada Pengaturan.');
+    }
+
     final payload = {
       'system_instruction': {
         'parts': [
@@ -195,7 +216,7 @@ Catatan:
                 'data': base64Image,
               }
             },
-            {'text': 'Baca struk belanja ini dan ekstrak informasinya secara rinci.'}
+            {'text': 'Baca foto struk belanja ini dan ekstrak informasinya secara rinci dalam JSON.'}
           ]
         }
       ],
@@ -205,10 +226,8 @@ Catatan:
       }
     };
 
-    final apiKey = await _getApiKey();
-
     try {
-      final response = await _postPayloadWithFallback(payload, apiKey);
+      final response = await _postPayloadWithFallback(payload, activeKey);
 
       final candidates = response.data['candidates'] as List?;
       if (candidates != null && candidates.isNotEmpty) {
@@ -224,7 +243,7 @@ Catatan:
           return result;
         }
       }
-      throw Exception('Gagal membaca gambar struk');
+      throw Exception('Foto struk tidak terbaca. Pastikan foto terang dan teks jelas.');
     } on DioException catch (e) {
       throw Exception(_extractDioErrorMessage(e));
     } catch (e) {
@@ -335,12 +354,17 @@ Aturan Respon:
         }
       }
       throw Exception('Gagal mendapatkan jawaban dari Nomi AI');
+    } on DioException catch (e) {
+      throw Exception(_extractDioErrorMessage(e));
     } catch (e) {
-      debugPrint('Cloud AI API failed ($e). Falling back to Local AI Engine.');
-      return LocalAiEngine.generateChatbotReply(
-        userMessage: userMessage,
-        financialContext: financialContext,
-      );
+      final err = e.toString().replaceAll('Exception: ', '');
+      if (err.contains('API Key') && err.contains('belum diisi')) {
+        return LocalAiEngine.generateChatbotReply(
+          userMessage: userMessage,
+          financialContext: financialContext,
+        );
+      }
+      throw Exception(err);
     }
   }
 
@@ -378,6 +402,8 @@ Aturan Respon:
     }
     throw Exception('Gagal mendapatkan respon dari Groq AI');
   }
+
+
 
   Future<Map<String, dynamic>> _callGroqJson({
     required String apiKey,
@@ -515,6 +541,8 @@ Aturan Respon:
             if (msg.contains('API_KEY_INVALID') ||
                 msg.contains('API key not valid') ||
                 msg.contains('API key expired') ||
+                msg.contains('Invalid API Key') ||
+                msg.contains('invalid_api_key') ||
                 msg.contains('User location is not supported')) {
               rethrow;
             }

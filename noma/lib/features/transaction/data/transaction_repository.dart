@@ -44,7 +44,8 @@ class TransactionRepository implements ITransactionRepository {
       ..addColumns([_db.transactions.amount.sum()])
       ..where(_db.transactions.type.equals('income'));
 
-    return query.watchSingle().map((row) {
+    return query.watchSingleOrNull().map((row) {
+      if (row == null) return 0.0;
       return row.read(_db.transactions.amount.sum()) ?? 0.0;
     });
   }
@@ -55,7 +56,8 @@ class TransactionRepository implements ITransactionRepository {
       ..addColumns([_db.transactions.amount.sum()])
       ..where(_db.transactions.type.equals('expense'));
 
-    return query.watchSingle().map((row) {
+    return query.watchSingleOrNull().map((row) {
+      if (row == null) return 0.0;
       return row.read(_db.transactions.amount.sum()) ?? 0.0;
     });
   }
@@ -67,8 +69,8 @@ class TransactionRepository implements ITransactionRepository {
         ..addColumns([_db.transactions.amount.sum()])
         ..where(_db.transactions.type.equals('expense'));
 
-      final expenseRow = await query.getSingle();
-      final expense = expenseRow.read(_db.transactions.amount.sum()) ?? 0.0;
+      final expenseRow = await query.getSingleOrNull();
+      final expense = expenseRow?.read(_db.transactions.amount.sum()) ?? 0.0;
       return income - expense;
     });
   }

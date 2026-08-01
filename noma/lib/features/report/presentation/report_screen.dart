@@ -26,10 +26,13 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Laporan & Statistik', style: AppTypography.headingMedium),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
       ),
       body: transactionsAsync.when(
         data: (allTransactions) {

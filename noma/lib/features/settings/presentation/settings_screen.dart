@@ -32,10 +32,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Pengaturan', style: AppTypography.headingMedium),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -160,7 +163,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Google Gemini 2.0 Flash', style: AppTypography.labelLarge),
+                      Text('Groq Cloud AI (Llama 3.3 70B)', style: AppTypography.labelLarge),
                       Text('Ketuk untuk atur API Key gratis', style: AppTypography.caption),
                     ],
                   ),

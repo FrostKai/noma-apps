@@ -28,7 +28,6 @@ class DashboardChartCard extends ConsumerWidget {
     return FloatingGlassCard(
       padding: const EdgeInsets.all(20),
       borderRadius: 20,
-      floatDistance: 4.0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

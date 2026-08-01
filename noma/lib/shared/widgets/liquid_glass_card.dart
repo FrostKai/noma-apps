@@ -5,7 +5,7 @@ import '../../core/theme/glass_theme.dart';
 import 'bouncy_tap.dart';
 import 'liquid_wave_painter.dart';
 
-/// Glass Card featuring an animated liquid wave background effect ("Liquid Balance Card")
+/// Glass Card featuring a smooth animated flowing liquid wave ("Balance Card")
 class LiquidGlassCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -67,7 +67,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard> with SingleTickerProv
       ),
       child: Stack(
         children: [
-          // Animated Liquid Wave Painter Layer
+          // Animated Flowing Liquid Wave Painter Layer
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -110,7 +110,6 @@ class _LiquidGlassCardState extends State<LiquidGlassCard> with SingleTickerProv
 
     if (widget.onTap != null) {
       return BouncyTap(
-        onTap: widget.onTap,
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(widget.borderRadius),

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -7,6 +8,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/glass_card.dart';
 
+/// Futuristic Pulsing Neon Pulse & Portal Zoom Splash Screen
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -14,41 +16,78 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late AnimationController _introController;
+  late AnimationController _exitController;
+
+  late Animation<double> _logoScaleAnimation;
+  late Animation<double> _logoFadeAnimation;
+  late Animation<double> _textFadeAnimation;
+  late Animation<double> _portalZoomAnimation;
+  late Animation<double> _exitFadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    // 1. Continuous Pulse Wave Controller
+    _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2400),
+    )..repeat();
+
+    // 2. Intro Stage Animation Controller
+    _introController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    _logoScaleAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _introController, curve: Curves.elasticOut),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    _logoFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _introController, curve: const Interval(0.0, 0.5, curve: Curves.easeIn)),
     );
 
-    _controller.forward();
+    _textFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _introController, curve: const Interval(0.4, 1.0, curve: Curves.easeOut)),
+    );
 
-    // Navigate to Home after 2.2 seconds
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    // 3. Exit Stage Portal Zoom Animation Controller
+    _exitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+
+    _portalZoomAnimation = Tween<double>(begin: 1.0, end: 4.0).animate(
+      CurvedAnimation(parent: _exitController, curve: Curves.easeInOutExpo),
+    );
+
+    _exitFadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _exitController, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
+    );
+
+    _introController.forward();
+
+    // Trigger Portal Exit and Navigate to Home
+    Future.delayed(const Duration(milliseconds: 2300), () {
       if (mounted) {
-        context.go(AppRoutes.home);
+        _exitController.forward().then((_) {
+          if (mounted) {
+            context.go(AppRoutes.home);
+          }
+        });
       }
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pulseController.dispose();
+    _introController.dispose();
+    _exitController.dispose();
     super.dispose();
   }
 
@@ -57,112 +96,126 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
+        alignment: Alignment.center,
         children: [
-          // Background Glow Orbs
-          Positioned(
-            top: -100,
-            left: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.25),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.25),
-                    blurRadius: 120,
-                    spreadRadius: 40,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            right: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.income.withValues(alpha: 0.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.income.withValues(alpha: 0.2),
-                    blurRadius: 100,
-                    spreadRadius: 30,
-                  ),
-                ],
-              ),
-            ),
+          // Ambient Background Energy Pulsing Rings
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              return CustomPaint(
+                size: MediaQuery.of(context).size,
+                painter: EnergyPulseRingsPainter(
+                  progress: _pulseController.value,
+                  primaryColor: AppColors.primary,
+                  secondaryColor: AppColors.income,
+                ),
+              );
+            },
           ),
 
-          // Main Content
-          Center(
+          // Portal Zoom & Fade Transition Wrap
+          AnimatedBuilder(
+            animation: _exitController,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _portalZoomAnimation.value,
+                child: Opacity(
+                  opacity: _exitFadeAnimation.value,
+                  child: child,
+                ),
+              );
+            },
             child: AnimatedBuilder(
-              animation: _controller,
+              animation: _introController,
               builder: (context, child) {
-                return FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Glass Logo Container
-                        GlassCard(
-                          padding: const EdgeInsets.all(20),
-                          borderRadius: 28,
-                          borderColor: AppColors.primary.withValues(alpha: 0.4),
-                          shadows: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
-                              blurRadius: 36,
-                              spreadRadius: 4,
-                            ),
-                          ],
-                          child: Image.asset(
-                            AppImages.logoIcon,
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Icon(
-                              Icons.account_balance_wallet_rounded,
-                              size: 64,
-                              color: AppColors.primary,
-                            ),
-                          ),
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Glowing Futuristic Glass Logo Card
+                    Transform.scale(
+                      scale: _logoScaleAnimation.value,
+                      child: Opacity(
+                        opacity: _logoFadeAnimation.value,
+                        child: AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            final pulseGlow = 24.0 + (math.sin(_pulseController.value * 2 * math.pi) * 12.0);
+                            return GlassCard(
+                              padding: const EdgeInsets.all(22),
+                              borderRadius: 32,
+                              backgroundColor: AppColors.backgroundSecondary.withValues(alpha: 0.85),
+                              borderColor: AppColors.primary.withValues(alpha: 0.6),
+                              shadows: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.45),
+                                  blurRadius: pulseGlow + 10,
+                                  spreadRadius: 4,
+                                ),
+                                BoxShadow(
+                                  color: AppColors.income.withValues(alpha: 0.2),
+                                  blurRadius: pulseGlow + 30,
+                                  spreadRadius: 8,
+                                ),
+                              ],
+                              child: Image.asset(
+                                AppImages.logoIcon,
+                                width: 84,
+                                height: 84,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => const Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  size: 64,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(height: 24),
-
-                        // Logo Wordmark
-                        Image.asset(
-                          AppImages.logoWordmark,
-                          height: 48,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            AppConstants.appName,
-                            style: AppTypography.amountDisplay.copyWith(
-                              fontSize: 40,
-                              color: AppColors.textPrimary,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Tagline
-                        Text(
-                          AppConstants.appTagline,
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 28),
+
+                    // App Wordmark & Tagline Fade In
+                    Opacity(
+                      opacity: _textFadeAnimation.value,
+                      child: Column(
+                        children: [
+                          Image.asset(
+                            AppImages.logoWordmark,
+                            height: 44,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Text(
+                              AppConstants.appName,
+                              style: AppTypography.amountDisplay.copyWith(
+                                fontSize: 38,
+                                color: AppColors.textPrimary,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Text(
+                              AppConstants.appTagline,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                                letterSpacing: 1.0,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -170,5 +223,44 @@ class _SplashScreenState extends State<SplashScreen>
         ],
       ),
     );
+  }
+}
+
+/// Custom Painter for Expanding Energy Pulsing Concentric Rings
+class EnergyPulseRingsPainter extends CustomPainter {
+  final double progress;
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  EnergyPulseRingsPainter({
+    required this.progress,
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = math.max(size.width, size.height) * 0.75;
+
+    for (int i = 0; i < 4; i++) {
+      final ringProgress = (progress + (i * 0.25)) % 1.0;
+      final radius = ringProgress * maxRadius;
+      final opacity = (1.0 - ringProgress).clamp(0.0, 1.0) * 0.55;
+
+      final paint = Paint()
+        ..color = i % 2 == 0
+            ? primaryColor.withValues(alpha: opacity)
+            : secondaryColor.withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 + (1.0 - ringProgress) * 4.0;
+
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant EnergyPulseRingsPainter oldDelegate) {
+    return true;
   }
 }

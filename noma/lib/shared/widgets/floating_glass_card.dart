@@ -4,7 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/glass_theme.dart';
 import 'bouncy_tap.dart';
 
-/// Reusable Glass Card with continuous subtle 3D floating & shadow pulsing animation
+/// Reusable Glass Card (Supports static presentation without floating motion)
 class FloatingGlassCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -27,7 +27,7 @@ class FloatingGlassCard extends StatefulWidget {
     this.backgroundColor = AppColors.glassCard,
     this.borderColor = AppColors.glassBorder,
     this.onTap,
-    this.floatDistance = 6.0,
+    this.floatDistance = 0.0, // Default to 0.0 (Static, no floating motion)
     this.duration = const Duration(milliseconds: 2800),
     this.width,
     this.height,
@@ -38,85 +38,93 @@ class FloatingGlassCard extends StatefulWidget {
 }
 
 class _FloatingGlassCardState extends State<FloatingGlassCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _translationAnimation;
-  late Animation<double> _shadowBlurAnimation;
+  AnimationController? _controller;
+  Animation<double>? _translationAnimation;
+  Animation<double>? _shadowBlurAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    )..repeat(reverse: true);
+    if (widget.floatDistance > 0.0) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: widget.duration,
+      )..repeat(reverse: true);
 
-    _translationAnimation = Tween<double>(
-      begin: 0.0,
-      end: -widget.floatDistance,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOutSine,
-      ),
-    );
+      _translationAnimation = Tween<double>(
+        begin: 0.0,
+        end: -widget.floatDistance,
+      ).animate(
+        CurvedAnimation(
+          parent: _controller!,
+          curve: Curves.easeInOutSine,
+        ),
+      );
 
-    _shadowBlurAnimation = Tween<double>(
-      begin: 24.0,
-      end: 38.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOutSine,
-      ),
-    );
+      _shadowBlurAnimation = Tween<double>(
+        begin: 24.0,
+        end: 38.0,
+      ).animate(
+        CurvedAnimation(
+          parent: _controller!,
+          curve: Curves.easeInOutSine,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget card = AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _translationAnimation.value),
-          child: Container(
-            width: widget.width,
-            height: widget.height,
-            padding: widget.padding,
-            decoration: BoxDecoration(
-              color: widget.backgroundColor,
-              borderRadius: BorderRadius.circular(widget.borderRadius),
-              border: Border.all(
-                color: widget.borderColor,
-                width: 1.0,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.1),
-                  Colors.white.withValues(alpha: 0.02),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: _shadowBlurAnimation.value,
-                  spreadRadius: 0,
-                  offset: Offset(0, 8 - (_translationAnimation.value * 0.5)),
-                ),
-              ],
-            ),
-            child: widget.child,
+    final hasMotion = widget.floatDistance > 0.0 && _controller != null;
+
+    Widget cardContent = Container(
+      width: widget.width,
+      height: widget.height,
+      padding: widget.padding,
+      decoration: BoxDecoration(
+        color: widget.backgroundColor,
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        border: Border.all(
+          color: widget.borderColor,
+          width: 1.0,
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.1),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: hasMotion ? _shadowBlurAnimation!.value : 28.0,
+            spreadRadius: 0,
+            offset: Offset(0, hasMotion ? 8 - (_translationAnimation!.value * 0.5) : 8),
           ),
-        );
-      },
+        ],
+      ),
+      child: widget.child,
     );
+
+    Widget card = hasMotion
+        ? AnimatedBuilder(
+            animation: _controller!,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _translationAnimation!.value),
+                child: cardContent,
+              );
+            },
+          )
+        : cardContent;
 
     Widget frosted = ClipRRect(
       borderRadius: BorderRadius.circular(widget.borderRadius),

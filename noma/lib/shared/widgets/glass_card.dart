@@ -64,7 +64,6 @@ class GlassCard extends StatelessWidget {
 
     if (onTap != null) {
       return BouncyTap(
-        onTap: onTap,
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(borderRadius),

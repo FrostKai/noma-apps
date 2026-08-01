@@ -98,7 +98,6 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
       padding: const EdgeInsets.all(16),
       borderRadius: 20,
       borderColor: AppColors.primary.withValues(alpha: 0.45),
-      floatDistance: 5.0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

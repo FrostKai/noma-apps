@@ -50,21 +50,15 @@ class _BouncyTapState extends State<BouncyTap> with SingleTickerProviderStateMix
   }
 
   void _onTapDown(TapDownDetails details) {
-    if (widget.onTap != null) {
-      _controller.forward();
-    }
+    _controller.forward();
   }
 
   void _onTapUp(TapUpDetails details) {
-    if (widget.onTap != null) {
-      _controller.reverse();
-    }
+    _controller.reverse();
   }
 
   void _onTapCancel() {
-    if (widget.onTap != null) {
-      _controller.reverse();
-    }
+    _controller.reverse();
   }
 
   @override

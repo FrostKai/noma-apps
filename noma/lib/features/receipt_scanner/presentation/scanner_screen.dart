@@ -105,7 +105,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (_scanResult == null) return;
 
     final storeName = (_scanResult!['store_name'] as String?) ?? 'Toko/Merchant';
-    final total = (_scanResult!['total'] as num?)?.toDouble() ?? 0.0;
+
+    double parseAmount(dynamic val) {
+      if (val is num) return val.toDouble();
+      if (val is String) {
+        final cleaned = val.replaceAll(RegExp(r'[^\d]'), '');
+        return double.tryParse(cleaned) ?? 0.0;
+      }
+      return 0.0;
+    }
+
+    final total = parseAmount(_scanResult!['total']);
     final category = (_scanResult!['category_suggestion'] as String?) ?? 'Belanja Harian';
     final dateStr = (_scanResult!['date'] as String?) ?? '';
     final items = (_scanResult!['items'] as List?) ?? [];
@@ -313,7 +323,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'AI Gemini akan mengekstrak toko, tanggal, & total belanja secara otomatis',
+                            'Groq Cloud AI akan mengekstrak toko, tanggal, & total belanja secara otomatis',
                             textAlign: TextAlign.center,
                             style: AppTypography.caption,
                           ),
@@ -329,7 +339,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         padding: const EdgeInsets.all(24),
                         child: const Center(
                           child: AiThinkingWidget(
-                            text: 'AI Gemini sedang membaca & mengekstrak struk',
+                            text: 'Groq Cloud AI sedang membaca & mengekstrak struk',
                           ),
                         ),
                       ),

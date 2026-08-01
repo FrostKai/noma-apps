@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_key_service.dart';
@@ -17,6 +18,8 @@ class AiKeySetupModal extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => AiKeySetupModal(onKeySaved: onKeySaved),
     );
@@ -72,8 +75,10 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final text = data?.text?.trim() ?? '';
 
-      // Gemini API Key format pattern check
-      if (text.startsWith('AIzaSy') && text.length >= 35) {
+      // Groq / OpenRouter / Gemini API Key format pattern check
+      if ((text.startsWith('gsk_') && text.length >= 20) ||
+          (text.startsWith('sk-or') && text.length >= 30) ||
+          (text.startsWith('AIzaSy') && text.length >= 35)) {
         if (mounted) {
           setState(() {
             _detectedKeyInClipboard = text;
@@ -230,18 +235,53 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
     await _testAndApplyKey(key);
   }
 
-  Future<void> _openGoogleAiStudio() async {
-    const url = 'https://aistudio.google.com/apikey';
+  Future<void> _openGroqConsole() async {
+    const urlStr = 'https://console.groq.com/keys';
+    final Uri uri = Uri.parse(urlStr);
     try {
-      await launchUrlString(url, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } else {
+        await launchUrl(uri);
+      }
     } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Buka browser ke: https://aistudio.google.com/apikey'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      try {
+        await launchUrlString(urlStr);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Silakan buka browser ke: https://console.groq.com/keys'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openGeminiConsole() async {
+    const urlStr = 'https://aistudio.google.com/app/apikey';
+    final Uri uri = Uri.parse(urlStr);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {
+      try {
+        await launchUrlString(urlStr);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Silakan buka browser ke: https://aistudio.google.com/app/apikey'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -273,18 +313,49 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle Bar
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.glassBorder,
-                  borderRadius: BorderRadius.circular(2),
+            // Interactive Handle Bar & Close Button
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: (details) {
+                if (details.primaryDelta != null && details.primaryDelta! > 4) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 32),
+                    Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: AppColors.textMuted.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(2.5),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: AppColors.textSecondary,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
             // Header Banner
             Row(
@@ -303,9 +374,9 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Aktifkan Asisten AI Noma', style: AppTypography.headingSmall),
+                      Text('Aktifkan Nomi Cloud AI', style: AppTypography.headingSmall),
                       Text(
-                        '100% Gratis Selamanya dari Google Gemini',
+                        'Dukungan Resmi Groq Cloud AI (Llama 3.3 70B)',
                         style: AppTypography.caption.copyWith(color: AppColors.income),
                       ),
                     ],
@@ -337,7 +408,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                         const Icon(Icons.stars_rounded, color: AppColors.income, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Kunci Google Gemini Terdeteksi!',
+                          'Kunci AI Terdeteksi di Clipboard!',
                           style: AppTypography.labelLarge.copyWith(color: AppColors.income),
                         ),
                       ],
@@ -362,21 +433,33 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
             ],
 
             // 3-STEP EASY GUIDED CARDS
-            Text('Panduan Mudah 30 Detik:', style: AppTypography.labelMedium),
+            Text('Panduan Mudah 30 Detik (Groq API):', style: AppTypography.labelMedium),
             const SizedBox(height: 10),
 
             _buildStepTile(
               stepNum: '1',
-              title: 'Dapatkan Kunci Gratis',
-              desc: 'Klik tombol di bawah untuk membuka Google AI Studio.',
+              title: 'Dapatkan API Key Gratis (Groq / Gemini)',
+              desc: 'Klik tombol untuk konsol Groq (Chat/Analisis) atau Gemini (Scan Struk Foto):',
               child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: GlassButton(
-                  label: '🌐 Ambil Key Gratis dari Google',
-                  icon: Icons.open_in_new_rounded,
-                  variant: GlassButtonVariant.primary,
-                  height: 42,
-                  onPressed: _openGoogleAiStudio,
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  children: [
+                    GlassButton(
+                      label: '⚡ Ambil Groq API Key (gsk_...)',
+                      icon: Icons.bolt_rounded,
+                      variant: GlassButtonVariant.income,
+                      height: 40,
+                      onPressed: _openGroqConsole,
+                    ),
+                    const SizedBox(height: 8),
+                    GlassButton(
+                      label: '👁️ Ambil Gemini API Key (Scan Struk Foto)',
+                      icon: Icons.center_focus_strong_rounded,
+                      variant: GlassButtonVariant.primary,
+                      height: 40,
+                      onPressed: _openGeminiConsole,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -385,7 +468,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
             _buildStepTile(
               stepNum: '2',
               title: 'Tekan "Create API Key" lalu Copy',
-              desc: 'Login akun Google HP-mu, tekan Create API Key, lalu tekan Copy.',
+              desc: 'Login akun Google/GitHub-mu, buat kunci baru, lalu salin.',
             ),
             const SizedBox(height: 10),
 
@@ -409,7 +492,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                     controller: _controller,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
-                      hintText: 'AIzaSy...',
+                      hintText: 'gsk_...',
                       hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
                       filled: true,
                       fillColor: AppColors.background,

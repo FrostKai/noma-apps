@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 
-/// Reusable Background Widget featuring animated ambient glow orbs
-/// and a continuous diagonal specular Glass Reflection sheen sweep
+/// Reusable Background Widget featuring ambient glow orbs
 class GlassReflectionBackground extends StatefulWidget {
   final Widget child;
 
@@ -15,24 +14,7 @@ class GlassReflectionBackground extends StatefulWidget {
   State<GlassReflectionBackground> createState() => _GlassReflectionBackgroundState();
 }
 
-class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> with SingleTickerProviderStateMixin {
-  late AnimationController _reflectionController;
-
-  @override
-  void initState() {
-    super.initState();
-    _reflectionController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 7),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _reflectionController.dispose();
-    super.dispose();
-  }
-
+class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> {
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -42,7 +24,7 @@ class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> w
           color: AppColors.background,
         ),
 
-        // 2. Ambient Glow Orb 1 (Top Left - Neon Cyan Glow)
+        // 2. Ambient Glow Orb 1 (Top Left - Amber Sunset Glow)
         Positioned(
           top: -120,
           left: -80,
@@ -51,10 +33,10 @@ class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> w
             height: 320,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.18),
+              color: AppColors.primary.withValues(alpha: 0.15),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.22),
+                  color: AppColors.primary.withValues(alpha: 0.18),
                   blurRadius: 140,
                   spreadRadius: 40,
                 ),
@@ -72,10 +54,10 @@ class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> w
             height: 280,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.income.withValues(alpha: 0.15),
+              color: AppColors.income.withValues(alpha: 0.12),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.income.withValues(alpha: 0.18),
+                  color: AppColors.income.withValues(alpha: 0.15),
                   blurRadius: 120,
                   spreadRadius: 30,
                 ),
@@ -84,39 +66,7 @@ class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> w
           ),
         ),
 
-        // 4. Animated Diagonal Specular Glass Reflection Sheen Sweep
-        Positioned.fill(
-          child: AnimatedBuilder(
-            animation: _reflectionController,
-            builder: (context, child) {
-              final progress = _reflectionController.value;
-              // Sweeps diagonally from top-left (-1.5) to bottom-right (2.5)
-              final startX = -1.5 + (progress * 4.0);
-              final startY = -1.5 + (progress * 4.0);
-              final endX = startX + 0.8;
-              final endY = startY + 0.8;
-
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment(startX, startY),
-                    end: Alignment(endX, endY),
-                    stops: const [0.0, 0.45, 0.5, 0.55, 1.0],
-                    colors: [
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.white.withValues(alpha: 0.05), // Specular Sheen Reflection
-                      Colors.transparent,
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-
-        // 5. Main Screen Content Layer
+        // 4. Main Screen Content Layer
         Positioned.fill(
           child: widget.child,
         ),
