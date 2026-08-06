@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_routes.dart';
 import '../../../core/services/api_key_service.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -26,6 +28,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? _imagePath;
   bool _isScanning = false;
   Map<String, dynamic>? _scanResult;
+  String? _lastScanError;
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -42,6 +45,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           _imageBytes = bytes;
           _imagePath = picked.path;
           _scanResult = null;
+          _lastScanError = null;
         });
         _processReceiptWithAi();
       }
@@ -59,8 +63,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Future<void> _processReceiptWithAi() async {
     if (_imageBytes == null) return;
 
-    final hasKey = await ApiKeyService.hasValidApiKey();
-    if (!hasKey) {
+    final geminiKey = await ApiKeyService.getGeminiApiKey();
+    if (ApiKeyService.sanitizeKey(geminiKey).isEmpty) {
       if (!mounted) return;
       AiKeySetupModal.show(context, onKeySaved: () => _processReceiptWithAi());
       return;
@@ -68,6 +72,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     setState(() {
       _isScanning = true;
+      _lastScanError = null;
     });
 
     try {
@@ -75,6 +80,24 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       final result = await aiService.scanReceiptImage(_imageBytes!);
 
       if (!mounted) return;
+
+      final validationError = _validateScanResult(result);
+      if (validationError != null) {
+        setState(() {
+          _isScanning = false;
+          _scanResult = null;
+          _lastScanError = validationError;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(validationError),
+            backgroundColor: AppColors.expense,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+        return;
+      }
 
       setState(() {
         _isScanning = false;
@@ -84,41 +107,129 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _showConfirmationBottomSheet();
     } catch (e) {
       if (!mounted) return;
+      final userMessage = _friendlyScanErrorMessage(e);
+      debugPrint('Receipt scan failed: $e');
+
       setState(() {
         _isScanning = false;
+        _lastScanError = userMessage;
       });
 
-      if (e.toString().contains('API Key')) {
-        AiKeySetupModal.show(context, onKeySaved: () => _processReceiptWithAi());
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal memproses struk: $e'),
-            backgroundColor: AppColors.expense,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(userMessage),
+          backgroundColor: AppColors.expense,
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Input Manual',
+            textColor: Colors.white,
+            onPressed: _openManualInput,
           ),
-        );
+        ),
+      );
+    }
+  }
+
+  String _friendlyScanErrorMessage(Object error) {
+    final raw = error.toString().replaceAll('Exception: ', '');
+
+    if (raw.contains('API Key') ||
+        raw.contains('API_KEY_INVALID') ||
+        raw.contains('invalid_api_key')) {
+      return 'Gemini API Key belum valid. Periksa kembali key di Pengaturan.';
+    }
+
+    if (raw.contains('429') ||
+        raw.contains('Quota') ||
+        raw.contains('RESOURCE_EXHAUSTED')) {
+      return 'Kuota Gemini sedang habis atau terlalu banyak percobaan. Coba lagi beberapa saat nanti.';
+    }
+
+    if (raw.contains('timeout') ||
+        raw.contains('terhubung') ||
+        raw.contains('connection')) {
+      return 'Koneksi ke Gemini belum stabil. Periksa internet lalu coba scan ulang.';
+    }
+
+    if (raw.contains('not found') || raw.contains('not supported')) {
+      return 'Model Gemini untuk scan belum tersedia di key ini. Coba ganti Gemini API Key atau input manual dulu.';
+    }
+
+    return 'Scan belum berhasil. Coba foto ulang dengan struk lebih terang dan total terlihat jelas.';
+  }
+
+  void _openManualInput() {
+    context.push(AppRoutes.addTransaction);
+  }
+
+  String? _validateScanResult(Map<String, dynamic> result) {
+    final aiError = result['error'];
+    if (aiError is String && aiError.trim().isNotEmpty) {
+      return aiError;
+    }
+
+    final total = _extractTotalAmount(result);
+    if (total <= 0) {
+      return 'Total struk tidak terbaca. Silakan scan ulang dengan foto yang lebih jelas atau input manual.';
+    }
+
+    return null;
+  }
+
+  double _parseAmount(dynamic val) {
+    if (val == null) return 0.0;
+    if (val is num) return val.toDouble();
+    if (val is String) {
+      final cleaned = val.replaceAll(RegExp(r'[^\d]'), '');
+      return double.tryParse(cleaned) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  double _extractTotalAmount(Map<String, dynamic> result) {
+    final items = (result['items'] as List?) ?? [];
+
+    final rawTotal =
+        result['total'] ??
+        result['total_amount'] ??
+        result['grand_total'] ??
+        result['jumlah_total'] ??
+        result['total_harga'] ??
+        result['total_belanja'] ??
+        result['amount'];
+
+    var extractedTotal = _parseAmount(rawTotal);
+
+    if (extractedTotal == 0.0 && items.isNotEmpty) {
+      for (final item in items) {
+        if (item is Map) {
+          final itemPrice = _parseAmount(
+            item['total_price'] ?? item['price'] ?? item['harga'],
+          );
+          extractedTotal += itemPrice;
+        }
       }
     }
+
+    return extractedTotal;
   }
 
   void _showConfirmationBottomSheet() {
     if (_scanResult == null) return;
 
-    final storeName = (_scanResult!['store_name'] as String?) ?? 'Toko/Merchant';
+    final storeName =
+        (_scanResult!['store_name'] as String?) ??
+        (_scanResult!['merchant'] as String?) ??
+        (_scanResult!['toko'] as String?) ??
+        'Struk Belanja';
 
-    double parseAmount(dynamic val) {
-      if (val is num) return val.toDouble();
-      if (val is String) {
-        final cleaned = val.replaceAll(RegExp(r'[^\d]'), '');
-        return double.tryParse(cleaned) ?? 0.0;
-      }
-      return 0.0;
-    }
-
-    final total = parseAmount(_scanResult!['total']);
-    final category = (_scanResult!['category_suggestion'] as String?) ?? 'Belanja Harian';
-    final dateStr = (_scanResult!['date'] as String?) ?? '';
     final items = (_scanResult!['items'] as List?) ?? [];
+
+    final extractedTotal = _extractTotalAmount(_scanResult!);
+
+    final category =
+        (_scanResult!['category_suggestion'] as String?) ?? 'Belanja Harian';
+    final dateStr = (_scanResult!['date'] as String?) ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -152,14 +263,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(Icons.check_circle_rounded, color: AppColors.income, size: 24),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.income,
+                    size: 24,
+                  ),
                   const SizedBox(width: 8),
-                  Text('Hasil Pemindaian Struk AI', style: AppTypography.headingSmall),
+                  Text(
+                    'Hasil Pemindaian Struk AI',
+                    style: AppTypography.headingSmall,
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Summary Card
+              // Summary Card (Clean static display as original)
               GlassCard(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -177,8 +295,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       children: [
                         Text('Total Belanja', style: AppTypography.caption),
                         Text(
-                          CurrencyFormatter.formatRupiah(total),
-                          style: AppTypography.amountLarge.copyWith(color: AppColors.expense),
+                          CurrencyFormatter.formatRupiah(extractedTotal),
+                          style: AppTypography.amountLarge.copyWith(
+                            color: AppColors.expense,
+                          ),
                         ),
                       ],
                     ),
@@ -189,7 +309,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         Text('Saran Kategori', style: AppTypography.caption),
                         Chip(
                           label: Text(category, style: AppTypography.caption),
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: 0.2,
+                          ),
                           side: const BorderSide(color: AppColors.primary),
                         ),
                       ],
@@ -201,10 +323,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
               // Items breakdown if available
               if (items.isNotEmpty) ...[
-                Text('Rincian Item (${items.length}):', style: AppTypography.labelMedium),
+                Text(
+                  'Rincian Item (${items.length}):',
+                  style: AppTypography.labelMedium,
+                ),
                 const SizedBox(height: 8),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 140),
+                  constraints: const BoxConstraints(maxHeight: 130),
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: items.length,
@@ -212,60 +337,88 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final name = (item['name'] as String?) ?? 'Item';
-                      final price = (item['total_price'] as num?)?.toDouble() ?? 0.0;
+                      final price = _parseAmount(
+                        item['total_price'] ?? item['price'] ?? item['harga'],
+                      );
                       final qty = (item['quantity'] as num?)?.toInt() ?? 1;
 
                       return Row(
                         children: [
                           Expanded(
-                            child: Text('$qty x $name', style: AppTypography.bodySmall),
+                            child: Text(
+                              '$qty x $name',
+                              style: AppTypography.bodySmall,
+                            ),
                           ),
                           Text(
                             CurrencyFormatter.formatRupiah(price),
-                            style: AppTypography.caption.copyWith(color: AppColors.textPrimary),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ],
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
               ],
 
-              // Confirm and Save Button
-              GlassButton(
-                label: 'Konfirmasi & Simpan Transaksi',
-                icon: Icons.save_rounded,
-                variant: GlassButtonVariant.expense,
-                onPressed: () async {
-                  final navigator = Navigator.of(modalContext);
-                  final screenNavigator = Navigator.of(context);
+              // Action Buttons Row (Scan Ulang & Simpan Transaksi)
+              Row(
+                children: [
+                  Expanded(
+                    child: GlassButton(
+                      label: 'Scan Ulang',
+                      icon: Icons.refresh_rounded,
+                      variant: GlassButtonVariant.warning,
+                      height: 48,
+                      onPressed: () {
+                        Navigator.of(modalContext).pop();
+                        _processReceiptWithAi();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: GlassButton(
+                      label: 'Simpan Transaksi',
+                      icon: Icons.save_rounded,
+                      variant: GlassButtonVariant.income,
+                      height: 48,
+                      onPressed: () async {
+                        final navigator = Navigator.of(modalContext);
+                        final screenNavigator = Navigator.of(context);
 
-                  DateTime txDate = DateTime.now();
-                  if (dateStr.isNotEmpty) {
-                    try {
-                      txDate = DateTime.parse(dateStr);
-                    } catch (_) {}
-                  }
+                        DateTime txDate = DateTime.now();
+                        if (dateStr.isNotEmpty) {
+                          try {
+                            txDate = DateTime.parse(dateStr);
+                          } catch (_) {}
+                        }
 
-                  final success = await ref
-                      .read(transactionControllerProvider.notifier)
-                      .addTransaction(
-                        type: 'expense',
-                        amount: total,
-                        category: category,
-                        description: 'Struk $storeName',
-                        source: 'receipt_scan',
-                        paymentMethod: 'Tunai',
-                        receiptImagePath: kIsWeb ? null : _imagePath,
-                        transactionDate: txDate,
-                      );
+                        final success = await ref
+                            .read(transactionControllerProvider.notifier)
+                            .addTransaction(
+                              type: 'expense',
+                              amount: extractedTotal,
+                              category: category,
+                              description: 'Struk $storeName',
+                              source: 'receipt_scan',
+                              paymentMethod: 'Tunai',
+                              receiptImagePath: kIsWeb ? null : _imagePath,
+                              transactionDate: txDate,
+                            );
 
-                  if (success) {
-                    navigator.pop();
-                    screenNavigator.pop();
-                  }
-                },
+                        if (success) {
+                          navigator.pop();
+                          screenNavigator.pop();
+                        }
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -281,7 +434,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       appBar: AppBar(
         title: Text('Pemindaian Struk AI', style: AppTypography.headingMedium),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -323,13 +479,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Groq Cloud AI akan mengekstrak toko, tanggal, & total belanja secara otomatis',
+                            'Nomi AI akan mengekstrak toko, tanggal, & total secara otomatis',
                             textAlign: TextAlign.center,
                             style: AppTypography.caption,
                           ),
                         ],
                       ),
                     ),
+
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 14,
+                    child: _buildScanGuideOverlay(),
+                  ),
 
                   // Futuristic AI Scanning & Thinking Animation Overlay
                   if (_isScanning)
@@ -339,7 +502,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         padding: const EdgeInsets.all(24),
                         child: const Center(
                           child: AiThinkingWidget(
-                            text: 'Groq Cloud AI sedang membaca & mengekstrak struk',
+                            text: 'Nomi AI sedang membaca & mengekstrak struk',
                           ),
                         ),
                       ),
@@ -347,17 +510,36 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
+
+            if (_lastScanError != null) ...[
+              _buildScanErrorCard(),
+              const SizedBox(height: 16),
+            ],
+
+            // Scan Ulang Button (Appears when photo is selected)
+            if (_imageBytes != null) ...[
+              GlassButton(
+                label: 'Scan Ulang',
+                icon: Icons.auto_awesome_rounded,
+                variant: GlassButtonVariant.income,
+                height: 48,
+                onPressed: _isScanning ? null : _processReceiptWithAi,
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Action Buttons (Kamera / Galeri)
             Row(
               children: [
                 Expanded(
                   child: GlassButton(
-                    label: 'Kamera',
+                    label: _imageBytes != null ? 'Foto Ulang' : 'Kamera',
                     icon: Icons.camera_alt_rounded,
                     variant: GlassButtonVariant.primary,
-                    onPressed: _isScanning ? null : () => _pickImage(ImageSource.camera),
+                    onPressed: _isScanning
+                        ? null
+                        : () => _pickImage(ImageSource.camera),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -366,13 +548,115 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                     label: 'Galeri HP',
                     icon: Icons.photo_library_rounded,
                     variant: GlassButtonVariant.secondary,
-                    onPressed: _isScanning ? null : () => _pickImage(ImageSource.gallery),
+                    onPressed: _isScanning
+                        ? null
+                        : () => _pickImage(ImageSource.gallery),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            GlassButton(
+              label: 'Input Manual',
+              icon: Icons.edit_note_rounded,
+              variant: GlassButtonVariant.outline,
+              height: 48,
+              onPressed: _openManualInput,
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildScanGuideOverlay() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.tips_and_updates_rounded,
+            color: AppColors.primary,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Pastikan nama toko, daftar item, dan total belanja terlihat jelas.',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textPrimary,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanErrorCard() {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      borderColor: AppColors.expense.withValues(alpha: 0.45),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.expense,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Scan belum berhasil',
+                style: AppTypography.labelLarge.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _lastScanError!,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GlassButton(
+                  label: 'Scan Ulang',
+                  icon: Icons.refresh_rounded,
+                  variant: GlassButtonVariant.warning,
+                  height: 42,
+                  onPressed: _imageBytes == null || _isScanning
+                      ? null
+                      : _processReceiptWithAi,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GlassButton(
+                  label: 'Input Manual',
+                  icon: Icons.edit_note_rounded,
+                  variant: GlassButtonVariant.outline,
+                  height: 42,
+                  onPressed: _openManualInput,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

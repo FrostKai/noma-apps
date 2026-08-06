@@ -21,7 +21,7 @@ class ApiKeyService {
     final clean = sanitizeKey(key);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyStorageKey, clean);
-    if (clean.startsWith('AIzaSy')) {
+    if (clean.startsWith('AIzaSy') || clean.startsWith('AQ.')) {
       await prefs.setString(_legacyKeyStorageKey, clean);
     }
   }
@@ -58,29 +58,26 @@ class ApiKeyService {
   static Future<String> getGeminiApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     final geminiUserKey = sanitizeKey(prefs.getString(_legacyKeyStorageKey) ?? '');
-    if (geminiUserKey.isNotEmpty && geminiUserKey.startsWith('AIzaSy')) {
+    if (geminiUserKey.isNotEmpty && !geminiUserKey.startsWith('gsk_')) {
       return geminiUserKey;
     }
 
     final primaryKey = await getApiKey();
-    if (primaryKey.startsWith('AIzaSy')) {
+    if (primaryKey.isNotEmpty && !primaryKey.startsWith('gsk_')) {
       return primaryKey;
     }
 
     final envGeminiKey = sanitizeKey(dotenv.env['GEMINI_API_KEY'] ?? '');
-    if (envGeminiKey.isNotEmpty && envGeminiKey.startsWith('AIzaSy')) {
+    if (envGeminiKey.isNotEmpty && !envGeminiKey.startsWith('gsk_')) {
       return envGeminiKey;
     }
 
     return '';
   }
 
-  /// Checks if a valid API key exists
+  /// Checks if AI engine is ready (always true with built-in fallbacks)
   static Future<bool> hasValidApiKey() async {
-    final key = await getApiKey();
-    return key.isNotEmpty &&
-        key != 'your_groq_api_key_here' &&
-        key != 'your_gemini_api_key_here';
+    return true;
   }
 
   /// Clears stored user API keys

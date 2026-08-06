@@ -4,7 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/glass_theme.dart';
 
-enum GlassButtonVariant { primary, secondary, income, expense, outline }
+enum GlassButtonVariant { primary, secondary, income, expense, warning, outline }
 
 class GlassButton extends StatelessWidget {
   final String label;
@@ -34,6 +34,8 @@ class GlassButton extends StatelessWidget {
         return AppColors.income;
       case GlassButtonVariant.expense:
         return AppColors.expense;
+      case GlassButtonVariant.warning:
+        return AppColors.warning;
       case GlassButtonVariant.secondary:
       case GlassButtonVariant.outline:
         return AppColors.textPrimary;

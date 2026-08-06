@@ -8,25 +8,46 @@ class GeminiApiService {
   final Dio _dio;
 
   static const List<String> _endpoints = [
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+  ];
+
+  static const List<String> _visionEndpoints = [
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
   ];
 
   GeminiApiService({Dio? dio})
-      : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 25),
-                receiveTimeout: const Duration(seconds: 35),
-              ),
-            );
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 25),
+              receiveTimeout: const Duration(seconds: 35),
+            ),
+          );
 
   Future<String> _getApiKey() async {
     final rawKey = await ApiKeyService.getApiKey();
     final key = ApiKeyService.sanitizeKey(rawKey);
-    if (key.isEmpty || key == 'your_groq_api_key_here' || key == 'your_gemini_api_key_here') {
-      throw Exception('API Key Groq belum diisi. Silakan dapatkan API Key gratis dari console.groq.com pada menu Pengaturan.');
+    if (key.isEmpty ||
+        key == 'your_groq_api_key_here' ||
+        key == 'your_gemini_api_key_here') {
+      throw Exception(
+        'API Key Groq belum diisi. Silakan dapatkan API Key gratis dari console.groq.com pada menu Pengaturan.',
+      );
+    }
+    return key;
+  }
+
+  Future<String> _getGeminiVisionApiKey() async {
+    final rawKey = await ApiKeyService.getGeminiApiKey();
+    final key = ApiKeyService.sanitizeKey(rawKey);
+    if (key.isEmpty || key == 'your_gemini_api_key_here') {
+      throw Exception(
+        'API Key Gemini belum diisi. Silakan masukkan Gemini API Key pada menu Pengaturan untuk memakai Scan Struk.',
+      );
     }
     return key;
   }
@@ -60,7 +81,9 @@ class GeminiApiService {
             if (msg.contains('User location is not supported')) {
               return 'Lokasi/IP Anda tidak didukung oleh Groq AI. Coba gunakan jaringan internet lain.';
             }
-            if (statusCode == 429 || msg.contains('Quota exceeded') || msg.contains('RESOURCE_EXHAUSTED')) {
+            if (statusCode == 429 ||
+                msg.contains('Quota exceeded') ||
+                msg.contains('RESOURCE_EXHAUSTED')) {
               return 'Batas kuota Groq API tercapai (429 Too Many Requests). Silakan tunggu beberapa saat atau gunakan API Key baru.';
             }
             return msg;
@@ -103,20 +126,20 @@ Catatan:
     final payload = {
       'system_instruction': {
         'parts': [
-          {'text': systemPrompt}
-        ]
+          {'text': systemPrompt},
+        ],
       },
       'contents': [
         {
           'parts': [
-            {'text': text}
-          ]
-        }
+            {'text': text},
+          ],
+        },
       ],
       'generationConfig': {
         'temperature': 0.1,
-        'response_mime_type': 'application/json',
-      }
+        'responseMimeType': 'application/json',
+      },
     };
 
     try {
@@ -161,73 +184,86 @@ Catatan:
     }
   }
 
-  /// 2. Scan Receipt Image using Gemini Vision Multimodal API
+  /// 2. Scan Receipt Image using Gemini Vision / Groq Vision / OpenRouter Vision API
   Future<Map<String, dynamic>> scanReceiptImage(Uint8List imageBytes) async {
-    final base64Image = base64Encode(imageBytes);
-
     const systemPrompt = '''
-Kamu adalah sistem ekstraksi struk belanja untuk aplikasi keuangan "Noma".
-Tugasmu adalah membaca foto struk yang diberikan dan mengembalikan data terstruktur dalam format JSON yang valid.
+Kamu adalah sistem ekstraksi struk belanja untuk aplikasi "Noma".
+Tugasmu adalah membaca gambar struk yang diberikan dan mengembalikan data dalam format JSON yang valid.
 
 Format JSON yang diharapkan:
 {
-  "store_name": "nama toko/merchant",
-  "date": "YYYY-MM-DD (jika tanggal ditemukan, jika tidak isi dengan tanggal hari ini)",
-  "total": angka (integer, total belanja akhir),
-  "category_suggestion": "kategori yang paling sesuai: Makanan & Minuman, Belanja Harian, Transportasi, Tagihan & Utilitas, Hiburan, Kesehatan, Fashion & Kecantikan, Rumah Tangga, Lainnya",
+  "store_name": string (nama toko/merchant),
+  "date": string (format YYYY-MM-DD, jika ada, atau tanggal hari ini),
+  "total": angka (integer, total belanja akhir/jumlah bayar tanpa titik/koma),
+  "category_suggestion": string (kategori paling sesuai dari pilihan: Makanan & Minuman, Belanja Harian, Transportasi, Tagihan & Utilitas, Hiburan, Kesehatan, Pendidikan, Fashion & Kecantikan, Rumah Tangga, Lainnya),
   "items": [
     {
-      "name": "nama barang",
-      "total_price": angka (integer),
-      "quantity": angka (integer)
+      "name": string (nama barang/produk),
+      "total_price": angka (integer, harga total per item),
+      "quantity": angka (integer, jumlah barang jika ada)
     }
   ]
 }
 
-Catatan:
-- Pastikan nilai total dan total_price berupa angka murni.
-- Jika foto bukan struk belanja atau teks tidak dapat dibaca, kembalikan JSON: {"error": "Foto tidak dapat dibaca atau bukan struk belanja"}
+Aturan Penting:
+1. Pastikan "total" dan "total_price" adalah angka integer murni tanpa titik atau koma (contoh: 46400 bukan 46.400).
+2. Baca dengan sangat teliti dan akurat seluruh teks, angka, dan harga pada struk.
+3. Hanya kembalikan objek JSON murni tanpa markdown ```json.
 ''';
 
-    final geminiKey = await ApiKeyService.getGeminiApiKey();
-    final primaryKey = await _getApiKey();
-    final activeKey = geminiKey.isNotEmpty ? geminiKey : primaryKey;
-
-    if (activeKey.isEmpty) {
-      throw Exception('API Key belum diatur. Silakan atur API Key pada menu Pengaturan.');
-    }
-
-    if (activeKey.startsWith('gsk_')) {
-      throw Exception('Groq API Key (gsk_) hanya mendukung teks/chat. Pemindaian foto struk membutuhkan Gemini API Key gratis (teknologi Google Lens). Silakan masukkan Gemini API Key pada Pengaturan.');
-    }
-
-    final payload = {
-      'system_instruction': {
-        'parts': [
-          {'text': systemPrompt}
-        ]
-      },
-      'contents': [
-        {
-          'parts': [
-            {
-              'inline_data': {
-                'mime_type': 'image/jpeg',
-                'data': base64Image,
-              }
-            },
-            {'text': 'Baca foto struk belanja ini dan ekstrak informasinya secara rinci dalam JSON.'}
-          ]
-        }
-      ],
-      'generationConfig': {
-        'temperature': 0.1,
-        'response_mime_type': 'application/json',
-      }
-    };
+    final base64Image = base64Encode(imageBytes);
+    debugPrint('=== [RECEIPT SCAN DEBUG] START ===');
+    debugPrint(
+      '[RECEIPT SCAN DEBUG] Image byte size: ${imageBytes.length} bytes',
+    );
+    debugPrint(
+      '[RECEIPT SCAN DEBUG] Base64 string length: ${base64Image.length}',
+    );
 
     try {
-      final response = await _postPayloadWithFallback(payload, activeKey);
+      final apiKey = await _getGeminiVisionApiKey();
+      final maskedKey = apiKey.length > 8
+          ? '${apiKey.substring(0, 6)}...'
+          : 'EMPTY';
+      debugPrint('[RECEIPT SCAN DEBUG] Using Gemini API Key: $maskedKey');
+
+      final payload = {
+        'system_instruction': {
+          'parts': [
+            {'text': systemPrompt},
+          ],
+        },
+        'contents': [
+          {
+            'parts': [
+              {
+                'inlineData': {'mimeType': 'image/jpeg', 'data': base64Image},
+              },
+              {
+                'text':
+                    'Tolong ekstrak data toko, tanggal, total bayar, dan rincian item dari foto struk belanja ini.',
+              },
+            ],
+          },
+        ],
+        'generationConfig': {
+          'temperature': 0.1,
+          'responseMimeType': 'application/json',
+        },
+      };
+
+      debugPrint(
+        '[RECEIPT SCAN DEBUG] Sending payload to Gemini API. System instruction included: ${payload.containsKey('system_instruction')}',
+      );
+      final response = await _postPayloadWithFallback(
+        payload,
+        apiKey,
+        endpoints: _visionEndpoints,
+        preferFirstRetryableError: true,
+      );
+      debugPrint(
+        '[RECEIPT SCAN DEBUG] Gemini API Response HTTP Status: ${response.statusCode}',
+      );
 
       final candidates = response.data['candidates'] as List?;
       if (candidates != null && candidates.isNotEmpty) {
@@ -235,19 +271,36 @@ Catatan:
         final parts = content['parts'] as List?;
         if (parts != null && parts.isNotEmpty) {
           final rawText = parts.first['text'] as String;
+          debugPrint(
+            '[RECEIPT SCAN DEBUG] Raw Response Text from Gemini:\n$rawText',
+          );
           final jsonString = _cleanJsonString(rawText);
-          final result = jsonDecode(jsonString) as Map<String, dynamic>;
-          if (result.containsKey('error')) {
-            throw Exception(result['error']);
-          }
-          return result;
+          debugPrint('[RECEIPT SCAN DEBUG] Cleaned JSON String:\n$jsonString');
+          final parsedJson = jsonDecode(jsonString) as Map<String, dynamic>;
+          debugPrint(
+            '[RECEIPT SCAN DEBUG] Successfully parsed JSON Map: $parsedJson',
+          );
+          return parsedJson;
         }
       }
-      throw Exception('Foto struk tidak terbaca. Pastikan foto terang dan teks jelas.');
+      debugPrint(
+        '[RECEIPT SCAN DEBUG] Response candidates missing or empty: ${response.data}',
+      );
+      throw Exception(
+        'Gagal mendapatkan respon pemindaian dari Cloud AI Vision',
+      );
     } on DioException catch (e) {
+      debugPrint(
+        '[RECEIPT SCAN DEBUG] DioException caught: statusCode=${e.response?.statusCode}, data=${e.response?.data}, error=${e.error}',
+      );
       throw Exception(_extractDioErrorMessage(e));
-    } catch (e) {
-      throw Exception(e.toString().replaceAll('Exception: ', ''));
+    } catch (e, stack) {
+      debugPrint('[RECEIPT SCAN DEBUG] General Exception caught: $e\n$stack');
+      final err = e.toString().replaceAll('Exception: ', '');
+      if (err.contains('API Key') && err.contains('belum diisi')) {
+        rethrow;
+      }
+      throw Exception(err);
     }
   }
 
@@ -257,94 +310,76 @@ Catatan:
     required String financialContext,
     required List<Map<String, String>> conversationHistory,
   }) async {
-    final systemPrompt = '''
-Kamu adalah "Nomi", asisten AI pintar, ramah, dan serba bisa dari aplikasi Noma.
-Tugasmu adalah menjawab PERTANYAAN APAPUN dari pengguna dengan cerdas, ramah, wawasan luas, dan solutif dalam Bahasa Indonesia.
+    final systemPrompt =
+        '''
+Kamu adalah "Nomi AI", asisten keuangan pribadi di aplikasi Noma.
+Gayamu ramah, profesional, ringkas, dan mudah dipahami. Gunakan Bahasa Indonesia yang natural.
 
-Kemampuanmu:
-1. Menjawab pertanyaan umum (pengetahuan umum, sains, teknologi, matematika, tips kehidupan, resep, hobi, analisis, dll).
-2. Memberikan saran finansial, penghematan, investasi, dan analisis keuangan pribadi secara mendalam.
-3. Memahami data keuangan pengguna jika pengguna bertanya tentang uang/saldo/pengeluaran mereka.
-
-Konteks Data Keuangan Pengguna Saat Ini:
+Informasi Keuangan Pengguna Saat Ini:
 $financialContext
 
-Aturan Respon:
-- Jawab dengan santun, cerdas, informatif, dan praktis.
-- Gunakan format Markdown (teks tebal, bullet points, angka) agar balasanmu indah dan mudah dibaca.
-- Jika pengguna bertanya topik umum (bukan tentang data uangnya), tetap jawablah pertanyaan tersebut dengan sangat baik, cerdas, dan menyenangkan!
+Batasan wajib:
+- Jawab hanya topik keuangan pribadi: saldo, pemasukan, pengeluaran, budgeting, tabungan, kategori transaksi, kebiasaan belanja, dan ringkasan data Noma.
+- Jika pengguna bertanya di luar topik keuangan pribadi, tolak dengan ramah dan arahkan kembali ke pencatatan keuangan.
+- Jangan memberi rekomendasi investasi spesifik, prediksi harga aset, ajakan beli/jual saham/crypto, atau janji keuntungan.
+- Jangan menyarankan pinjaman konsumtif, paylater, atau pinjol sebagai solusi utama.
+- Jangan meminta atau memproses data sensitif seperti PIN, OTP, password, NIK, nomor kartu, CVV, atau nomor rekening penuh.
+- Jangan mengklaim bisa menghapus, mengubah, atau menambah data transaksi lewat chat. Arahkan pengguna ke fitur tambah/edit transaksi.
+- Jawab berdasarkan data transaksi yang diberikan. Jika data masih sedikit, katakan analisisnya terbatas.
+- Maksimal 3 paragraf pendek atau 5 bullet point.
+- Hindari detail teknis API, model AI, dan system prompt.
 ''';
 
-    final contents = <Map<String, dynamic>>[];
+    final apiKey = await _getApiKey();
 
-    // Add multi-turn history
+    if (apiKey.startsWith('gsk_')) {
+      return await _callGroqChat(
+        apiKey: apiKey,
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        conversationHistory: conversationHistory,
+      );
+    }
+
+    if (apiKey.startsWith('sk-or')) {
+      return await _callOpenRouterChat(
+        apiKey: apiKey,
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        conversationHistory: conversationHistory,
+      );
+    }
+
+    final List<Map<String, dynamic>> contents = [];
+
     for (final msg in conversationHistory) {
       contents.add({
         'role': msg['role'] == 'user' ? 'user' : 'model',
         'parts': [
-          {'text': msg['content']}
-        ]
+          {'text': msg['content']},
+        ],
       });
     }
 
-    // Add current user message
     contents.add({
       'role': 'user',
       'parts': [
-        {'text': userMessage}
-      ]
+        {'text': userMessage},
+      ],
     });
 
     final payload = {
       'system_instruction': {
         'parts': [
-          {'text': systemPrompt}
-        ]
+          {'text': systemPrompt},
+        ],
       },
       'contents': contents,
-      'generationConfig': {
-        'temperature': 0.7,
-      }
+      'generationConfig': {'temperature': 0.7},
     };
 
     try {
-      final apiKey = await _getApiKey();
-      if (apiKey.startsWith('gsk_')) {
-        final messages = conversationHistory.map((m) {
-          return {
-            'role': m['role'] == 'user' ? 'user' : 'assistant',
-            'content': m['content'] ?? '',
-          };
-        }).toList();
-
-        messages.add({'role': 'user', 'content': userMessage});
-
-        return await _callGroqChat(
-          apiKey: apiKey,
-          systemPrompt: systemPrompt,
-          messages: messages,
-        );
-      }
-
-      if (apiKey.startsWith('sk-or')) {
-        final messages = conversationHistory.map((m) {
-          return {
-            'role': m['role'] == 'user' ? 'user' : 'assistant',
-            'content': m['content'] ?? '',
-          };
-        }).toList();
-
-        messages.add({'role': 'user', 'content': userMessage});
-
-        return await _callOpenRouterChat(
-          apiKey: apiKey,
-          systemPrompt: systemPrompt,
-          messages: messages,
-        );
-      }
-
       final response = await _postPayloadWithFallback(payload, apiKey);
-
       final candidates = response.data['candidates'] as List?;
       if (candidates != null && candidates.isNotEmpty) {
         final content = candidates.first['content'];
@@ -353,57 +388,15 @@ Aturan Respon:
           return parts.first['text'] as String;
         }
       }
-      throw Exception('Gagal mendapatkan jawaban dari Nomi AI');
-    } on DioException catch (e) {
-      throw Exception(_extractDioErrorMessage(e));
+      return 'Maaf, Nomi sedang kesulitan memproses pesan Anda saat ini. Silakan coba lagi.';
     } catch (e) {
-      final err = e.toString().replaceAll('Exception: ', '');
-      if (err.contains('API Key') && err.contains('belum diisi')) {
-        return LocalAiEngine.generateChatbotReply(
-          userMessage: userMessage,
-          financialContext: financialContext,
-        );
-      }
-      throw Exception(err);
+      debugPrint('Gemini API Error, falling back to Local Engine: $e');
+      return LocalAiEngine.generateChatbotReply(
+        userMessage: userMessage,
+        financialContext: financialContext,
+      );
     }
   }
-
-  Future<String> _callGroqChat({
-    required String apiKey,
-    required String systemPrompt,
-    required List<Map<String, String>> messages,
-  }) async {
-    final formattedMessages = <Map<String, String>>[
-      {'role': 'system', 'content': systemPrompt},
-      ...messages,
-    ];
-
-    final response = await _dio.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      data: {
-        'model': 'llama-3.3-70b-versatile',
-        'messages': formattedMessages,
-        'temperature': 0.7,
-      },
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-      ),
-    );
-
-    final choices = response.data['choices'] as List?;
-    if (choices != null && choices.isNotEmpty) {
-      final messageObj = choices.first['message'];
-      if (messageObj != null && messageObj['content'] != null) {
-        return messageObj['content'] as String;
-      }
-    }
-    throw Exception('Gagal mendapatkan respon dari Groq AI');
-  }
-
-
 
   Future<Map<String, dynamic>> _callGroqJson({
     required String apiKey,
@@ -414,11 +407,11 @@ Aturan Respon:
       'https://api.groq.com/openai/v1/chat/completions',
       data: {
         'model': 'llama-3.3-70b-versatile',
+        'response_format': {'type': 'json_object'},
         'messages': [
           {'role': 'system', 'content': systemPrompt},
           {'role': 'user', 'content': userText},
         ],
-        'response_format': {'type': 'json_object'},
         'temperature': 0.1,
       },
       options: Options(
@@ -440,29 +433,36 @@ Aturan Respon:
     throw Exception('Gagal mendapatkan JSON dari Groq AI');
   }
 
-  Future<String> _callOpenRouterChat({
+  Future<String> _callGroqChat({
     required String apiKey,
     required String systemPrompt,
-    required List<Map<String, String>> messages,
+    required String userMessage,
+    required List<Map<String, String>> conversationHistory,
   }) async {
-    final formattedMessages = <Map<String, String>>[
+    final List<Map<String, String>> messages = [
       {'role': 'system', 'content': systemPrompt},
-      ...messages,
     ];
 
+    for (final msg in conversationHistory) {
+      messages.add({
+        'role': msg['role'] == 'user' ? 'user' : 'assistant',
+        'content': msg['content']!,
+      });
+    }
+
+    messages.add({'role': 'user', 'content': userMessage});
+
     final response = await _dio.post(
-      'https://openrouter.ai/api/v1/chat/completions',
+      'https://api.groq.com/openai/v1/chat/completions',
       data: {
-        'model': 'meta-llama/llama-3.3-70b-instruct:free',
-        'messages': formattedMessages,
+        'model': 'llama-3.3-70b-versatile',
+        'messages': messages,
         'temperature': 0.7,
       },
       options: Options(
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $apiKey',
-          'HTTP-Referer': 'https://noma.app',
-          'X-Title': 'Noma Financial App',
         },
       ),
     );
@@ -474,7 +474,7 @@ Aturan Respon:
         return messageObj['content'] as String;
       }
     }
-    throw Exception('Gagal mendapatkan respon dari OpenRouter AI');
+    return 'Maaf, Nomi sedang kesulitan memproses pesan saat ini.';
   }
 
   Future<Map<String, dynamic>> _callOpenRouterJson({
@@ -486,19 +486,17 @@ Aturan Respon:
       'https://openrouter.ai/api/v1/chat/completions',
       data: {
         'model': 'meta-llama/llama-3.3-70b-instruct:free',
+        'response_format': {'type': 'json_object'},
         'messages': [
           {'role': 'system', 'content': systemPrompt},
           {'role': 'user', 'content': userText},
         ],
-        'response_format': {'type': 'json_object'},
         'temperature': 0.1,
       },
       options: Options(
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $apiKey',
-          'HTTP-Referer': 'https://noma.app',
-          'X-Title': 'Noma Financial App',
         },
       ),
     );
@@ -514,25 +512,77 @@ Aturan Respon:
     throw Exception('Gagal mendapatkan JSON dari OpenRouter AI');
   }
 
-  /// Posts payload with automatic model endpoint fallback chain & dual headers/query authentication
-  Future<Response> _postPayloadWithFallback(Map<String, dynamic> payload, String apiKey) async {
-    DioException? lastException;
+  Future<String> _callOpenRouterChat({
+    required String apiKey,
+    required String systemPrompt,
+    required String userMessage,
+    required List<Map<String, String>> conversationHistory,
+  }) async {
+    final List<Map<String, String>> messages = [
+      {'role': 'system', 'content': systemPrompt},
+    ];
 
-    final options = Options(
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
+    for (final msg in conversationHistory) {
+      messages.add({
+        'role': msg['role'] == 'user' ? 'user' : 'assistant',
+        'content': msg['content']!,
+      });
+    }
+
+    messages.add({'role': 'user', 'content': userMessage});
+
+    final response = await _dio.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      data: {
+        'model': 'meta-llama/llama-3.3-70b-instruct:free',
+        'messages': messages,
+        'temperature': 0.7,
       },
+      options: Options(
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+      ),
     );
 
-    for (final endpoint in _endpoints) {
+    final choices = response.data['choices'] as List?;
+    if (choices != null && choices.isNotEmpty) {
+      final messageObj = choices.first['message'];
+      if (messageObj != null && messageObj['content'] != null) {
+        return messageObj['content'] as String;
+      }
+    }
+    return 'Maaf, Nomi sedang kesulitan memproses pesan saat ini.';
+  }
+
+  /// Posts payload with automatic model endpoint fallback chain & dual headers/query authentication
+  Future<Response> _postPayloadWithFallback(
+    Map<String, dynamic> payload,
+    String apiKey, {
+    List<String>? endpoints,
+    bool preferFirstRetryableError = false,
+  }) async {
+    DioException? lastException;
+    DioException? firstRetryableException;
+
+    final cleanKey = ApiKeyService.sanitizeKey(apiKey);
+    final encodedKey = Uri.encodeComponent(cleanKey);
+
+    final options = Options(
+      headers: {'Content-Type': 'application/json', 'x-goog-api-key': cleanKey},
+    );
+
+    for (final endpoint in endpoints ?? _endpoints) {
       try {
-        final url = '$endpoint?key=$apiKey';
+        final url = '$endpoint?key=$encodedKey';
         return await _dio.post(url, data: payload, options: options);
       } on DioException catch (e) {
         lastException = e;
+        debugPrint(
+          'Gemini endpoint $endpoint failed: ${e.response?.statusCode} - ${e.response?.data}',
+        );
 
-        // Check if error is an API Key or Auth error -> rethrow immediately!
         final data = e.response?.data;
         if (data is Map && data.containsKey('error')) {
           final errObj = data['error'];
@@ -553,14 +603,22 @@ Aturan Respon:
           rethrow;
         }
 
-        // Only fallback to next model if endpoint is 404 (not found) or 429 (rate limit on specific model) or 503
         final statusCode = e.response?.statusCode;
-        if (statusCode == 404 || statusCode == 429 || statusCode == 503) {
+        if (statusCode == 429 || statusCode == 503) {
+          firstRetryableException ??= e;
+          continue;
+        }
+
+        if (statusCode == 404) {
           continue;
         }
 
         rethrow;
       }
+    }
+
+    if (preferFirstRetryableError && firstRetryableException != null) {
+      throw firstRetryableException;
     }
 
     if (lastException != null) {
@@ -582,7 +640,6 @@ Aturan Respon:
     }
     cleaned = cleaned.trim();
 
-    // Fallback regex to extract JSON object if markdown stripping left extra characters
     final match = RegExp(r'\{[\s\S]*\}').firstMatch(cleaned);
     if (match != null) {
       return match.group(0)!;

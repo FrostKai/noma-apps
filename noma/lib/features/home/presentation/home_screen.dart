@@ -7,6 +7,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../shared/widgets/glass_button.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../transaction/presentation/add_transaction_screen.dart';
 import '../../transaction/presentation/providers/transaction_provider.dart';
@@ -72,10 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(height: 28),
 
                 // Recent Transactions Header & Search/Filter
-                Text(
-                  'Riwayat Transaksi',
-                  style: AppTypography.headingMedium,
-                ),
+                Text('Riwayat Transaksi', style: AppTypography.headingMedium),
                 const SizedBox(height: 12),
 
                 // Search & Filter Bar
@@ -101,10 +99,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           AppImages.logoWordmark,
           height: 32,
           fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => Text(
-            'Noma',
-            style: AppTypography.headingLarge,
-          ),
+          errorBuilder: (context, error, stackTrace) =>
+              Text('Noma', style: AppTypography.headingLarge),
         ),
         GlassCard(
           padding: const EdgeInsets.all(10),
@@ -156,7 +152,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
@@ -166,10 +165,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.auto_awesome, color: AppColors.primary, size: 14),
+                    const Icon(
+                      Icons.auto_awesome,
+                      color: AppColors.primary,
+                      size: 14,
+                    ),
                     const SizedBox(width: 4),
                     Text(
-                      'AI Active',
+                      'Nomi AI',
                       style: AppTypography.caption.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
@@ -270,15 +273,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildQuickActions(BuildContext context) {
     final actions = [
       {
-        'title': 'Scan Struk',
+        'title': 'Tambah',
+        'icon': Icons.add_circle_outline_rounded,
+        'color': AppColors.income,
+        'route': AppRoutes.addTransaction,
+      },
+      {
+        'title': 'Scan',
         'icon': Icons.document_scanner_rounded,
         'color': AppColors.primary,
         'route': AppRoutes.scanner,
       },
       {
-        'title': 'Chat AI',
+        'title': 'Nomi AI',
         'icon': Icons.chat_bubble_outline_rounded,
-        'color': AppColors.income,
+        'color': AppColors.info,
         'route': AppRoutes.chatbot,
       },
       {
@@ -350,11 +359,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           style: AppTypography.bodyMedium,
           decoration: InputDecoration(
             hintText: 'Cari transaksi (kategori, catatan, nominal)...',
-            hintStyle: AppTypography.caption.copyWith(color: AppColors.textMuted),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+            hintStyle: AppTypography.caption.copyWith(
+              color: AppColors.textMuted,
+            ),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
             filled: true,
             fillColor: AppColors.glassSurface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: AppColors.glassBorder),
@@ -382,7 +400,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 selected: isSelected,
                 selectedColor: AppColors.primary,
                 backgroundColor: AppColors.glassSurface,
-                side: BorderSide(color: isSelected ? AppColors.primary : AppColors.glassBorder),
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary : AppColors.glassBorder,
+                ),
                 labelStyle: TextStyle(
                   color: isSelected ? Colors.white : AppColors.textSecondary,
                   fontSize: 12,
@@ -412,7 +432,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final filtered = transactions.where((tx) {
           final matchesType = _filterType == 'all' || tx.type == _filterType;
           final query = _searchQuery.toLowerCase();
-          final matchesQuery = query.isEmpty ||
+          final matchesQuery =
+              query.isEmpty ||
               tx.category.toLowerCase().contains(query) ||
               (tx.description?.toLowerCase().contains(query) ?? false) ||
               (tx.paymentMethod?.toLowerCase().contains(query) ?? false) ||
@@ -422,7 +443,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         if (filtered.isEmpty) {
           return GlassCard(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(22),
             borderRadius: 16,
             child: Center(
               child: Column(
@@ -441,7 +462,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    _searchQuery.isNotEmpty ? 'Transaksi tidak ditemukan' : 'Belum ada transaksi',
+                    _searchQuery.isNotEmpty
+                        ? 'Transaksi tidak ditemukan'
+                        : 'Belum ada transaksi',
                     style: AppTypography.headingSmall.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -450,10 +473,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text(
                     _searchQuery.isNotEmpty
                         ? 'Coba gunakan kata kunci pencarian yang lain.'
-                        : 'Tekan tombol + atau ketik teks AI di atas untuk mencatat transaksi pertamamu.',
+                        : 'Mulai dengan tambah manual atau scan struk pertama kamu.',
                     textAlign: TextAlign.center,
                     style: AppTypography.caption,
                   ),
+                  if (_searchQuery.isEmpty) ...[
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Tambah',
+                            icon: Icons.add_rounded,
+                            variant: GlassButtonVariant.income,
+                            height: 44,
+                            onPressed: () =>
+                                context.push(AppRoutes.addTransaction),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Scan',
+                            icon: Icons.document_scanner_rounded,
+                            variant: GlassButtonVariant.primary,
+                            height: 44,
+                            onPressed: () => context.push(AppRoutes.scanner),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -472,7 +522,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => AddTransactionScreen(initialTransaction: tx),
+                      builder: (context) =>
+                          AddTransactionScreen(initialTransaction: tx),
                     ),
                   );
                 },
@@ -481,7 +532,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Hapus Transaksi?'),
-                      content: Text('Yakin ingin menghapus transaksi ${tx.category} senilai ${CurrencyFormatter.formatRupiah(tx.amount)}?'),
+                      content: Text(
+                        'Yakin ingin menghapus transaksi ${tx.category} senilai ${CurrencyFormatter.formatRupiah(tx.amount)}?',
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
@@ -489,14 +542,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Hapus', style: TextStyle(color: AppColors.expense)),
+                          child: const Text(
+                            'Hapus',
+                            style: TextStyle(color: AppColors.expense),
+                          ),
                         ),
                       ],
                     ),
                   );
 
                   if (confirm == true) {
-                    ref.read(transactionControllerProvider.notifier).deleteTransaction(tx.id);
+                    ref
+                        .read(transactionControllerProvider.notifier)
+                        .deleteTransaction(tx.id);
                   }
                 },
               ),

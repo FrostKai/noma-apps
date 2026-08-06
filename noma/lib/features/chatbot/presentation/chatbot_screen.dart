@@ -12,10 +12,7 @@ import 'widgets/chat_bubble.dart';
 class ChatbotScreen extends ConsumerStatefulWidget {
   final bool isTabPage;
 
-  const ChatbotScreen({
-    super.key,
-    this.isTabPage = false,
-  });
+  const ChatbotScreen({super.key, this.isTabPage = false});
 
   @override
   ConsumerState<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -51,11 +48,19 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
   }
 
+  void _sendQuickPrompt(String text) {
+    ref.read(chatbotControllerProvider.notifier).sendMessage(text);
+    Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<void>>(chatbotControllerProvider, (prev, next) {
       if (next.hasError && !next.isLoading) {
-        final errorMsg = (next.error ?? '').toString().replaceAll('Exception: ', '');
+        final errorMsg = (next.error ?? '').toString().replaceAll(
+          'Exception: ',
+          '',
+        );
         if (errorMsg.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -65,7 +70,9 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             ),
           );
 
-          if (errorMsg.contains('API Key') || errorMsg.contains('API_KEY_INVALID') || errorMsg.contains('invalid_api_key')) {
+          if (errorMsg.contains('API Key') ||
+              errorMsg.contains('API_KEY_INVALID') ||
+              errorMsg.contains('invalid_api_key')) {
             AiKeySetupModal.show(context);
           }
         }
@@ -79,8 +86,12 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     final isKeyboardActive = keyboardHeight > 0;
 
     final bottomMargin = widget.isTabPage
-        ? (isKeyboardActive ? keyboardHeight + 12.0 : 88.0 + mediaQuery.padding.bottom)
-        : (isKeyboardActive ? keyboardHeight + 12.0 : 16.0 + mediaQuery.padding.bottom);
+        ? (isKeyboardActive
+              ? keyboardHeight + 12.0
+              : 88.0 + mediaQuery.padding.bottom)
+        : (isKeyboardActive
+              ? keyboardHeight + 12.0
+              : 16.0 + mediaQuery.padding.bottom);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -97,19 +108,27 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
         leading: widget.isTabPage
             ? null
             : IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppColors.textPrimary,
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_sweep_rounded, color: AppColors.textSecondary),
+            icon: const Icon(
+              Icons.delete_sweep_rounded,
+              color: AppColors.textSecondary,
+            ),
             tooltip: 'Hapus Obrolan',
             onPressed: () async {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Hapus Riwayat Chat?'),
-                  content: const Text('Semua percakapan dengan Nomi AI akan dihapus dari HP.'),
+                  content: const Text(
+                    'Semua percakapan dengan Nomi AI akan dihapus dari HP.',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -117,7 +136,10 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Hapus', style: TextStyle(color: AppColors.expense)),
+                      child: const Text(
+                        'Hapus',
+                        style: TextStyle(color: AppColors.expense),
+                      ),
                     ),
                   ],
                 ),
@@ -156,38 +178,51 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Halo! Saya Nomi 👋',
+                            'Halo! Saya Nomi',
                             style: AppTypography.headingLarge,
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Tanyakan apa saja seputar keuanganmu. Misal:\n"Berapa total pengeluaranku?" atau "Beri saran penghematan"',
+                            'Tanyakan seputar saldo, pengeluaran, budgeting, dan tips hemat berdasarkan data Noma.',
                             textAlign: TextAlign.center,
                             style: AppTypography.caption,
                           ),
+                          const SizedBox(height: 18),
+                          _buildQuickPrompts(),
                         ],
                       ),
                     ),
                   );
                 }
 
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _scrollToBottom(),
+                );
 
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 16),
+                  padding: const EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: 16,
+                  ),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     return ChatBubble(
                       message: msg.content,
                       isUser: msg.role == 'user',
-                      timestamp: DateTime.fromMillisecondsSinceEpoch(msg.createdAt),
+                      timestamp: DateTime.fromMillisecondsSinceEpoch(
+                        msg.createdAt,
+                      ),
                     );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
               error: (err, _) => Center(child: Text('Error: $err')),
             ),
           ),
@@ -218,7 +253,9 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             child: GlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               borderRadius: 28,
-              backgroundColor: AppColors.backgroundSecondary.withValues(alpha: 0.9),
+              backgroundColor: AppColors.backgroundSecondary.withValues(
+                alpha: 0.9,
+              ),
               borderColor: AppColors.glassBorder,
               shadows: [
                 BoxShadow(
@@ -241,8 +278,11 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                       controller: _controller,
                       style: AppTypography.bodyMedium,
                       decoration: const InputDecoration(
-                        hintText: 'Tanyakan sesuatu pada Nomi AI...',
-                        hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                        hintText: 'Tanyakan seputar keuanganmu...',
+                        hintStyle: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
                         isDense: true,
                         contentPadding: EdgeInsets.symmetric(vertical: 10),
@@ -279,6 +319,34 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuickPrompts() {
+    final prompts = [
+      'Berapa saldo saya?',
+      'Pengeluaran bulan ini',
+      'Kategori terbesar',
+      'Beri saran hemat',
+    ];
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: prompts.map((prompt) {
+        return ActionChip(
+          label: Text(prompt),
+          avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
+          backgroundColor: AppColors.glassSurface,
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
+          labelStyle: AppTypography.caption.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+          onPressed: () => _sendQuickPrompt(prompt),
+        );
+      }).toList(),
     );
   }
 }
