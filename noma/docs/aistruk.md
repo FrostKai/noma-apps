@@ -1,5 +1,26 @@
 # 🧾 AI Struk — Panduan Membangun AI Pembaca Struk Belanja
 
+## Status Implementasi Noma Saat Ini - 7 Agustus 2026
+
+Dokumen ini adalah panduan untuk opsi masa depan jika Noma ingin membangun AI pembaca struk sendiri. Implementasi aplikasi saat ini belum memakai model open-source self-hosted atau fine-tuning.
+
+Yang berjalan di kode saat ini:
+
+- Flutter mengambil gambar via `image_picker` dari kamera atau galeri.
+- Gambar di-resize oleh `image_picker` dengan `maxWidth: 1200`, `maxHeight: 1600`, dan `imageQuality: 85`.
+- Byte gambar dikirim langsung dari client ke Gemini Vision melalui `GeminiApiService.scanReceiptImage`.
+- Response JSON divalidasi minimal: harus punya total lebih dari 0 atau total hasil penjumlahan item.
+- Hasil ditampilkan dalam bottom sheet ringkasan lalu disimpan ke Drift sebagai transaksi `expense` dengan source `receipt_scan`.
+
+Rekomendasi jangka pendek sebelum masuk fine-tuning:
+
+1. Tambahkan form review/edit hasil scan: total, toko, tanggal, kategori, payment method, dan item utama.
+2. Simpan confidence atau flag "perlu review" bila total diperoleh dari penjumlahan item, bukan field total eksplisit.
+3. Batasi debug log agar tidak terlalu banyak mencetak payload/response saat production.
+4. Gunakan backend proxy jika ingin melindungi API key dan mengontrol quota.
+
+Gunakan sisa dokumen ini hanya bila arah produk berubah ke AI server milik sendiri atau model open-source yang di-host terpisah.
+
 > Dokumen ini menjelaskan cara **membangun AI pembaca struk belanja** sendiri menggunakan model open-source yang sudah ada (fine-tuning), mulai dari pemilihan model, pengumpulan dataset, training, deployment, hingga integrasi ke aplikasi Flutter Noma.
 
 ---

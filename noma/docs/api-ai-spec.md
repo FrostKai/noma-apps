@@ -1,5 +1,20 @@
 # Spesifikasi API AI - Noma (Aplikasi Pencatatan Uang Berbasis AI)
 
+## Status Implementasi Saat Ini - 7 Agustus 2026
+
+Kode saat ini tidak lagi hanya memakai Google Gemini. `GeminiApiService` tetap menjadi nama kelas utama, tetapi implementasinya mendukung beberapa provider:
+
+- Gemini untuk text/chat: fallback endpoint `gemini-2.0-flash` lalu `gemini-1.5-flash`.
+- Gemini Vision untuk scan struk: fallback endpoint `gemini-2.5-flash`, `gemini-2.5-flash-lite`, lalu endpoint eksperimen yang tercatat di kode.
+- Groq untuk text/chat saat API key ber-prefix `gsk_`, memakai endpoint OpenAI-compatible `https://api.groq.com/openai/v1/chat/completions`.
+- OpenRouter untuk text/chat saat API key ber-prefix `sk-or`.
+- Fallback lokal rule-based tersedia untuk parsing teks dan chatbot saat AI cloud gagal atau key belum tersedia. Scan struk tetap membutuhkan Gemini API key.
+
+Catatan keamanan:
+
+- `.env` saat ini dimuat sebagai Flutter asset. Ini praktis untuk development, tetapi tidak aman untuk secret production karena asset aplikasi dapat diekstrak.
+- Untuk rilis publik, gunakan API key pengguna melalui `SharedPreferences` atau backend proxy milik Noma. Jangan bundle API key production ke APK/web asset.
+
 Dokumen ini menjelaskan spesifikasi lengkap integrasi AI menggunakan **Google Gemini API** pada aplikasi Noma (Android/Flutter).
 
 ## 1. Gambaran Umum Integrasi AI
@@ -9,9 +24,11 @@ Noma memanfaatkan AI Generatif untuk mempermudah pencatatan dan pengelolaan keua
 2. **Pemindaian Struk (Receipt Scanner)**: Mengekstrak informasi dari foto struk belanja secara otomatis.
 3. **Chatbot Asisten Keuangan**: Memberikan saran dan insight keuangan berbasis data transaksi pengguna secara interaktif.
 
-- **AI Provider**: Google Gemini API
-- **Base Endpoint**: `https://generativelanguage.googleapis.com/v1beta/`
-- **Model yang digunakan**: `gemini-2.0-flash` (mendukung multimodal: teks dan gambar)
+- **AI Provider utama**: Google Gemini API
+- **Provider tambahan di kode saat ini**: Groq dan OpenRouter untuk text/chat
+- **Base Endpoint Gemini**: `https://generativelanguage.googleapis.com/v1beta/`
+- **Model text/chat Gemini**: `gemini-2.0-flash`, fallback ke `gemini-1.5-flash`
+- **Model scan struk Gemini Vision**: `gemini-2.5-flash`, fallback ke varian lite jika endpoint utama gagal
 - **Klien**: Aplikasi Flutter menggunakan package `dio`
 
 ## 2. Konfigurasi & Authentication
@@ -272,7 +289,9 @@ Aplikasi harus mengirim ulang konteks data user (ringkasan bulan ini) dan bebera
 ## 5. Keamanan API Key
 
 **SANGAT PENTING**: Jangan pernah menaruh API Key secara hardcode di dalam kode Flutter.
-- Gunakan file `.env` (melalui package `flutter_dotenv`) untuk menyimpan `GEMINI_API_KEY`.
+- Untuk development lokal, file `.env` bisa dipakai melalui `flutter_dotenv`, tetapi jangan masukkan secret production ke asset aplikasi.
+- Pastikan `.env` masuk `.gitignore` dan gunakan placeholder `.env.example` bila perlu.
+- API key yang dimasukkan pengguna disimpan lokal melalui `SharedPreferences`.
 - Untuk keamanan yang lebih baik di production (skala menengah-besar), sangat disarankan agar aplikasi Flutter tidak langsung menembak API Gemini. Sebaiknya: `Flutter App` -> `Backend (Node.js/Go) milik Noma` -> `Gemini API`. Dengan begitu API Key tersimpan aman di server backend, bukan di aplikasi klien yang bisa di-reverse engineer.
 
 ## 6. Fallback & Offline Behavior

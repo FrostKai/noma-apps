@@ -4,6 +4,26 @@
 
 ---
 
+## Update Audit - 7 Agustus 2026
+
+Beberapa temuan lama sudah berubah setelah implementasi terbaru:
+
+- Formatting nominal real-time sudah tersedia di form tambah/edit transaksi melalui `ThousandsSeparatorInputFormatter`.
+- Filter transaksi dan pencarian di dashboard sudah tersedia.
+- Filter periode laporan sudah tersedia dalam bentuk sederhana: bulan ini, bulan lalu, semua waktu.
+- Empty state dashboard sudah lebih informatif dengan CTA tambah dan scan.
+- Tema visual aktual sudah bergeser dari cyan-dominant ke amber/orange Noma dengan dark glassmorphism.
+
+Temuan yang masih relevan:
+
+1. Flow AI text perlu diperbaiki karena hasil parsing dibuka sebagai `initialTransaction` dengan `id: 0`; aksi simpan berpotensi masuk mode update, bukan create.
+2. Receipt scanner perlu form review/edit hasil scan sebelum simpan, bukan hanya bottom sheet ringkasan.
+3. Chatbot perlu konteks finansial yang lebih kaya: periode, kategori terbesar, transaksi terbaru, dan ringkasan bulan berjalan.
+4. Feedback sukses simpan transaksi masih bisa dibuat lebih jelas dan konsisten.
+5. Keamanan `.env` perlu diperbaiki sebelum rilis publik.
+
+---
+
 ## 📅 Informasi Audit
 * **Tanggal Audit**: 26 Juli 2026
 * **Peran Auditor**: Senior Frontend Developer & UI/UX Specialist

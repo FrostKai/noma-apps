@@ -1,5 +1,16 @@
 # Arsitektur Teknis Noma: Aplikasi Pencatatan Uang Berbasis AI
 
+## Status Implementasi Saat Ini - 7 Agustus 2026
+
+Arsitektur yang berjalan saat ini adalah Flutter + Riverpod + Drift dengan pola feature-first. Beberapa bagian di bawah masih menjelaskan target ideal, jadi status aktualnya perlu dicatat:
+
+- Layer domain formal belum lengkap. Implementasi saat ini lebih dekat ke "Clean Architecture Lite": screen/widget -> Riverpod provider/controller -> repository -> Drift/API service.
+- Database lokal sudah memakai Drift dengan conditional connection untuk native dan web.
+- Provider global yang aktif: `databaseProvider` dan `geminiApiServiceProvider`.
+- AI service aktif mendukung Gemini, Groq, dan OpenRouter berdasarkan prefix API key. Dokumentasi lama yang menyebut hanya Gemini perlu dibaca sebagai target awal.
+- Notifikasi harian memakai `flutter_local_notifications.zonedSchedule`. `workmanager` belum menjadi dependency aktif dan belum digunakan di kode.
+- Fitur AI tetap client-side. Untuk production publik, API key client-side harus diperlakukan sebagai risiko dan idealnya dipindah ke backend proxy.
+
 Dokumen ini menguraikan arsitektur teknis lengkap untuk aplikasi **Noma**, aplikasi pencatatan keuangan pintar berbasis AI untuk perangkat Android.
 
 ## 1. Gambaran Umum Arsitektur
@@ -131,10 +142,13 @@ Noma sangat bergantung pada integrasi Gemini API untuk memfasilitasi pencatatan 
 
 Untuk mengingatkan pengguna agar mencatat keuangan, Noma menggunakan notifikasi lokal yang dijadwalkan secara background.
 
-1. **Setup Awal**: Konfigurasi `flutter_local_notifications` dan `workmanager` di `main.dart`.
-2. **Scheduling**: Di `SettingsFeature`, jika user mengaktifkan pengingat, aplikasi mendaftarkan *task* berulang di `workmanager` (misal, setiap jam 20:00).
-3. **Background Execution**: Meskipun aplikasi ditutup, Workmanager akan terbangun pada waktu yang dijadwalkan, mengeksekusi kode Dart di *background isolate*, dan memanggil `flutter_local_notifications` untuk memunculkan notifikasi.
-4. **Interaction**: Saat notifikasi diketuk, aplikasi terbuka dan `go_router` mengarahkan pengguna langsung ke layar 'Tambah Transaksi'.
+Status implementasi saat ini:
+
+1. **Setup Awal**: `main.dart` menginisialisasi `NotificationService.initialize()` pada platform non-web.
+2. **Scheduling**: `SettingsScreen` menyimpan preferensi notifikasi ke `SharedPreferences` dan memanggil `NotificationService.scheduleDailyReminder(hour, minute)`.
+3. **Eksekusi**: Jadwal harian dibuat dengan `flutter_local_notifications.zonedSchedule` dan timezone `Asia/Jakarta`.
+4. **Interaction**: Saat notifikasi diketuk, payload diarahkan ke route tambah transaksi melalui `appRouter.go(AppRoutes.addTransaction)`.
+5. **Catatan**: `workmanager` belum digunakan. Jika butuh ringkasan dinamis berdasarkan total pengeluaran hari ini saat aplikasi tertutup, perlu background task tambahan atau strategi scheduling ulang.
 
 ## 7. Dependency Injection & Arsitektur Provider
 

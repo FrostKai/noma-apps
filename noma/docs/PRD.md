@@ -1,5 +1,26 @@
 # Product Requirements Document (PRD) - Noma
 
+## Status Implementasi Saat Ini - 7 Agustus 2026
+
+Dokumen ini tetap menjadi rujukan produk, tetapi kondisi kode saat ini sudah melewati scaffold awal dan berada pada fase MVP fungsional. Implementasi yang sudah tersedia:
+
+- Pencatatan transaksi manual: tambah, edit, hapus, tanggal, kategori, metode pembayaran.
+- Dashboard: saldo bersih, total pemasukan, total pengeluaran, grafik ringkas, pencarian, dan filter jenis transaksi.
+- Kategori: daftar kategori default, tambah kategori kustom, hapus kategori kustom.
+- AI text input: parsing teks natural memakai Cloud AI atau fallback rule-based lokal, lalu membuka layar konfirmasi transaksi.
+- Receipt scanner: ambil gambar kamera/galeri, kirim ke Gemini Vision, tampilkan hasil ekstraksi, lalu simpan sebagai pengeluaran.
+- Chatbot Nomi AI: riwayat chat lokal, konteks saldo/pemasukan/pengeluaran, fallback lokal saat AI gagal.
+- Laporan: filter periode sederhana, bar chart pemasukan vs pengeluaran, donut chart pengeluaran per kategori.
+- Pengaturan: API key Groq/Gemini, notifikasi harian lokal, manajemen kategori.
+
+Gap produk yang masih perlu diselesaikan:
+
+- Review hasil AI text saat ini memakai mode edit transaksi dengan `id: 0`; secara teknis ini perlu diperbaiki agar menyimpan sebagai transaksi baru.
+- Receipt scanner belum punya form koreksi rinci sebelum simpan; pengguna baru bisa scan ulang, input manual, atau simpan hasil.
+- Chatbot belum menerima konteks kategori, transaksi terbaru, atau periode spesifik, sehingga analisis seperti "kategori terbesar bulan ini" masih terbatas.
+- Tidak ada cloud sync, multi-dompet, budget per kategori, export CSV/PDF, atau backup data.
+- API key di client Flutter tetap berisiko untuk produksi; pendekatan production sebaiknya memakai backend proxy.
+
 ## 1. Ringkasan Eksekutif
 **Noma** adalah aplikasi pencatatan keuangan pribadi berbasis Android yang dirancang untuk mempermudah pengguna dalam melacak pemasukan dan pengeluaran sehari-hari. Berbeda dengan aplikasi pencatatan tradisional yang membutuhkan input manual yang kaku, Noma mengintegrasikan kecerdasan buatan (AI) berbasis cloud (Google Gemini Flash) untuk memungkinkan input melalui teks natural, pemindaian struk belanja, dan asisten pintar untuk menganalisis keuangan. Produk ini dibangun menggunakan Flutter dengan arsitektur Riverpod dan penyimpanan lokal SQLite, mengusung antarmuka modern Dark Mode dan efek Glassmorphism.
 

@@ -1,5 +1,17 @@
 # Desain Skema Database Noma
 
+## Status Implementasi Saat Ini - 7 Agustus 2026
+
+Skema di dokumen ini sudah cukup selaras dengan kode `lib/core/database/app_database.dart`. Status aktual:
+
+- Tabel aktif: `transactions`, `categories`, `chat_messages`, dan `app_settings`.
+- `schemaVersion` masih `1`.
+- Seeding kategori default sudah dilakukan pada `MigrationStrategy.onCreate`.
+- Relasi kategori ke transaksi masih loose coupling melalui `Transactions.category` bertipe string.
+- Belum ada index eksplisit seperti `idx_transactions_date`, `idx_transactions_type`, `idx_transactions_category`, atau `idx_chat_created_at`.
+- Belum ada DAO terpisah; query berada di repository/provider.
+- Koneksi native menyimpan database sebagai `noma_app.db` di application documents directory. Web memakai `WebDatabase('noma_app')`.
+
 ## 1. Gambaran Umum Database
 Aplikasi "Noma" (Aplikasi Pencatatan Uang Berbasis AI) menggunakan database lokal **SQLite** yang diimplementasikan menggunakan **Drift** (wrapper SQLite yang *type-safe* untuk Flutter/Dart). Semua data disimpan 100% secara lokal di perangkat keras pengguna, tanpa adanya sinkronisasi ke server (cloud-free). Pendekatan ini menjamin privasi pengguna dan memastikan aplikasi dapat berjalan secara *offline* sepenuhnya.
 

@@ -1,5 +1,23 @@
 # Roadmap Pengembangan Aplikasi Noma - Pencatatan Uang Berbasis AI
 
+## Status Roadmap Saat Ini - 7 Agustus 2026
+
+MVP utama sudah diimplementasikan di kode Flutter. Dokumen roadmap ini sekarang dipakai sebagai rujukan progres, bukan daftar task kosong. Status ringkas:
+
+- Fase 1 Foundation: selesai. Struktur Flutter, Riverpod, Drift, routing, tema, asset, dan seeding kategori sudah ada.
+- Fase 2 Core transaction: sebagian besar selesai. CRUD transaksi, kategori, dashboard, pencarian, dan filter sudah ada. Edit kategori kustom belum tersedia, baru tambah/hapus.
+- Fase 3 AI text dan receipt scanner: sebagian besar selesai. Parsing teks, scan struk, kamera/galeri, loading state, dan penyimpanan hasil sudah ada. Koreksi hasil scan sebelum simpan masih perlu ditingkatkan.
+- Fase 4 Chatbot dan notifikasi: sebagian selesai. Chatbot dan local notification scheduling sudah ada. `workmanager` belum dipakai dan tidak tercatat sebagai dependency aktif.
+- Fase 5 Laporan dan polish: sebagian besar selesai. Laporan bar/pie chart, filter periode sederhana, pengaturan API key/notifikasi, dan UI polish sudah ada. Release APK belum diverifikasi dalam dokumen ini.
+
+Prioritas teknis berikutnya:
+
+1. Perbaiki flow AI text agar hasil parsing disimpan sebagai transaksi baru, bukan update `id: 0`.
+2. Amankan `.env`: jangan bundle secret production ke asset Flutter, dan masukkan `.env` ke `.gitignore`.
+3. Perluas konteks chatbot dengan ringkasan periode, kategori terbesar, dan transaksi terbaru.
+4. Tambahkan form koreksi hasil scan struk sebelum simpan.
+5. Sinkronkan dokumentasi dependency: hapus klaim `workmanager` jika tidak dipakai, atau tambahkan implementasinya jika memang diperlukan.
+
 Aplikasi "Noma" adalah aplikasi pencatatan keuangan pribadi berbasis AI (Artificial Intelligence) untuk platform Android. Aplikasi ini dirancang untuk memudahkan pengguna dalam mencatat, melacak, dan menganalisis pengeluaran serta pemasukan menggunakan teknologi natural language processing dan computer vision.
 
 Dokumen ini merinci roadmap pengembangan untuk Minimum Viable Product (MVP) dengan kerangka waktu 5 minggu untuk solo developer.
