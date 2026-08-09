@@ -183,7 +183,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Tanyakan seputar saldo, pengeluaran, budgeting, dan tips hemat berdasarkan data Noma.',
+                            'Tanyakan seputar saldo, pengeluaran, budgeting, dan tips hemat berdasarkan data Noma.\n(Riwayat chat dibersihkan otomatis setiap 24 jam)',
                             textAlign: TextAlign.center,
                             style: AppTypography.caption,
                           ),
@@ -237,6 +237,42 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                   isCompact: true,
                   text: 'Nomi AI sedang memproses jawaban',
                 ),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              child: Row(
+                children: [
+                  'Berapa saldo saya?',
+                  'Pengeluaran bulan ini',
+                  'Kategori terbesar',
+                  '5 transaksi terakhir',
+                  'Beri saran hemat',
+                ].map((prompt) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      label: Text(prompt),
+                      avatar: const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      backgroundColor: AppColors.glassSurface,
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      labelStyle: AppTypography.caption.copyWith(
+                        color: AppColors.textPrimary,
+                        fontSize: 11,
+                      ),
+                      onPressed: () => _sendQuickPrompt(prompt),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
 

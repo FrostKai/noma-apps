@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/product_tour_keys.dart';
 import '../../core/services/api_key_service.dart';
 import '../../core/theme/app_typography.dart';
 import 'glass_button.dart';
@@ -11,18 +13,33 @@ import 'glass_card.dart';
 
 class AiKeySetupModal extends StatefulWidget {
   final VoidCallback? onKeySaved;
+  final VoidCallback? onClose;
 
-  const AiKeySetupModal({super.key, this.onKeySaved});
+  const AiKeySetupModal({super.key, this.onKeySaved, this.onClose});
 
-  static Future<void> show(BuildContext context, {VoidCallback? onKeySaved}) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      enableDrag: true,
-      isDismissible: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => AiKeySetupModal(onKeySaved: onKeySaved),
+  /// Tampilkan modal menggunakan OverlayEntry di dalam tree ShowCaseWidget
+  /// sehingga Showcase key di dalamnya bisa ditemukan oleh ShowcaseView.
+  static OverlayEntry? _overlayEntry;
+
+  static void show(BuildContext context, {VoidCallback? onKeySaved}) {
+    // Cegah double-show
+    if (_overlayEntry != null) return;
+    final overlayState = Overlay.of(context);
+    _overlayEntry = OverlayEntry(
+      builder: (ctx) => AiKeySetupModal(
+        onKeySaved: onKeySaved,
+        onClose: () {
+          _overlayEntry?.remove();
+          _overlayEntry = null;
+        },
+      ),
     );
+    overlayState.insert(_overlayEntry!);
+  }
+
+  static void dismiss() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
   }
 
   @override
@@ -258,62 +275,61 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: bottomInset + 24,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundSecondary.withValues(alpha: 0.95),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: AppColors.glassBorder, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
-            blurRadius: 30,
-            spreadRadius: 5,
+    return Stack(
+      children: [
+        // Scrim — tap to dismiss
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: widget.onClose,
+            child: Container(color: Colors.black54),
           ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle Bar & Close Button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ),
+        // Modal panel pinned to bottom
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: screenHeight * 0.88),
+            child: Container(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: bottomInset > 0 ? bottomInset + 16 : 24,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundSecondary.withValues(alpha: 0.98),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(color: AppColors.glassBorder, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
-                const SizedBox(width: 32),
-                Container(
-                  width: 48,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: AppColors.textMuted.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(2.5),
-                  ),
+            // Center Handle Bar
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
-                InkWell(
-                  onTap: () => Navigator.of(context).pop(),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: AppColors.textSecondary,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -445,11 +461,26 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                           Text('1. Groq Key (Chat & Analisis)', style: AppTypography.labelLarge),
                         ],
                       ),
-                      InkWell(
-                        onTap: _openGroqConsole,
-                        child: Text(
-                          'Ambil Key',
-                          style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      Showcase(
+                        key: ProductTourKeys.modalGroqBtn,
+                        title: '1. Ambil Groq Key Gratis',
+                        description:
+                            'Ketuk tombol ini → console.groq.com terbuka.\n'
+                            'Buat API Key baru gratis lalu salin (copy) kuncinya.',
+                        targetBorderRadius: BorderRadius.circular(10),
+                        targetPadding: const EdgeInsets.all(4),
+                        tooltipBackgroundColor: const Color(0xE61A1A2E),
+                        titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                        child: InkWell(
+                          onTap: _openGroqConsole,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            child: Text(
+                              'Ambil Key',
+                              style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -457,39 +488,47 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                   const SizedBox(height: 6),
                   Text('Kunci untuk Chatbot Nomi AI & Analisis Finansial (console.groq.com)', style: AppTypography.caption),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _groqController,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          onChanged: (val) {
-                            if (_isGroqSaved) {
-                              setState(() => _isGroqSaved = false);
-                            }
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'gsk_...',
-                            hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
-                            filled: true,
-                            fillColor: AppColors.background,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.glassBorder),
+                  Showcase(
+                    key: ProductTourKeys.modalGroqInput,
+                    title: '2. Tempel & Simpan Groq Key',
+                    description: 'Tempelkan kunci gsk_... di kolom ini lalu tekan Simpan.',
+                    targetBorderRadius: BorderRadius.circular(14),
+                    targetPadding: const EdgeInsets.all(2),
+                    tooltipBackgroundColor: const Color(0xE61A1A2E),
+                    titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _groqController,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            onChanged: (val) {
+                              if (_isGroqSaved) setState(() => _isGroqSaved = false);
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'gsk_...',
+                              hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.glassBorder),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      GlassButton(
-                        label: _isTestingGroq ? '...' : (_isGroqSaved ? 'Tersimpan' : 'Simpan'),
-                        variant: _isGroqSaved ? GlassButtonVariant.income : GlassButtonVariant.warning,
-                        width: 90,
-                        height: 42,
-                        onPressed: _isTestingGroq ? null : () => _saveGroqKey(_groqController.text),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        GlassButton(
+                          label: _isTestingGroq ? '...' : (_isGroqSaved ? 'Tersimpan' : 'Simpan'),
+                          variant: _isGroqSaved ? GlassButtonVariant.income : GlassButtonVariant.warning,
+                          width: 90,
+                          height: 42,
+                          onPressed: _isTestingGroq ? null : () => _saveGroqKey(_groqController.text),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -513,11 +552,26 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                           Text('2. Gemini Key (Scan Struk Foto)', style: AppTypography.labelLarge),
                         ],
                       ),
-                      InkWell(
-                        onTap: _openGeminiConsole,
-                        child: Text(
-                          'Ambil Key',
-                          style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      Showcase(
+                        key: ProductTourKeys.modalGeminiBtn,
+                        title: '3. Ambil Gemini Key Gratis',
+                        description:
+                            'Ketuk tombol ini → aistudio.google.com terbuka.\n'
+                            'Buat API Key gratis lalu salin kuncinya.',
+                        targetBorderRadius: BorderRadius.circular(10),
+                        targetPadding: const EdgeInsets.all(4),
+                        tooltipBackgroundColor: const Color(0xE61A1A2E),
+                        titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                        child: InkWell(
+                          onTap: _openGeminiConsole,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            child: Text(
+                              'Ambil Key',
+                              style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -525,47 +579,59 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                   const SizedBox(height: 6),
                   Text('Kunci penglihatan AI untuk Scan Struk (aistudio.google.com)', style: AppTypography.caption),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _geminiController,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          onChanged: (val) {
-                            if (_isGeminiSaved) {
-                              setState(() => _isGeminiSaved = false);
-                            }
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'AIzaSy... atau AQ....',
-                            hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
-                            filled: true,
-                            fillColor: AppColors.background,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.glassBorder),
+                  Showcase(
+                    key: ProductTourKeys.modalGeminiInput,
+                    title: '4. Tempel & Simpan Gemini Key',
+                    description: 'Tempelkan kunci Gemini ke kolom ini lalu tekan Simpan.',
+                    targetBorderRadius: BorderRadius.circular(14),
+                    targetPadding: const EdgeInsets.all(2),
+                    tooltipBackgroundColor: const Color(0xE61A1A2E),
+                    titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _geminiController,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            onChanged: (val) {
+                              if (_isGeminiSaved) setState(() => _isGeminiSaved = false);
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'AIzaSy... atau AQ....',
+                              hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.glassBorder),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      GlassButton(
-                        label: _isTestingGemini ? '...' : (_isGeminiSaved ? 'Tersimpan' : 'Simpan'),
-                        variant: _isGeminiSaved ? GlassButtonVariant.income : GlassButtonVariant.warning,
-                        width: 90,
-                        height: 42,
-                        onPressed: _isTestingGemini ? null : () => _saveGeminiKey(_geminiController.text),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        GlassButton(
+                          label: _isTestingGemini ? '...' : (_isGeminiSaved ? 'Tersimpan' : 'Simpan'),
+                          variant: _isGeminiSaved ? GlassButtonVariant.income : GlassButtonVariant.warning,
+                          width: 90,
+                          height: 42,
+                          onPressed: _isTestingGemini ? null : () => _saveGeminiKey(_geminiController.text),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
+          ], // end Column children
+                ),  // end Column
+              ),    // end SingleChildScrollView
+            ),      // end Container
+          ),        // end ConstrainedBox
+        ),          // end Positioned (modal panel)
+      ],            // end Stack children
+    );             // end Stack
   }
 }

@@ -4,8 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import 'glass_card.dart';
 
-/// Futuristic AI Thinking Animation Widget with rotating neural rings,
-/// pulsing glowing particles, and animated wave dots
+/// Clean & Modern AI Thinking Loading Widget
 class AiThinkingWidget extends StatefulWidget {
   final String text;
   final bool isCompact;
@@ -15,14 +14,15 @@ class AiThinkingWidget extends StatefulWidget {
     super.key,
     this.text = 'Nomi AI sedang berpikir...',
     this.isCompact = false,
-    this.size = 64.0,
+    this.size = 56.0,
   });
 
   @override
   State<AiThinkingWidget> createState() => _AiThinkingWidgetState();
 }
 
-class _AiThinkingWidgetState extends State<AiThinkingWidget> with SingleTickerProviderStateMixin {
+class _AiThinkingWidgetState extends State<AiThinkingWidget>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -30,7 +30,7 @@ class _AiThinkingWidgetState extends State<AiThinkingWidget> with SingleTickerPr
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 800), // ~0.8s linear infinite loop
     )..repeat();
   }
 
@@ -50,225 +50,211 @@ class _AiThinkingWidgetState extends State<AiThinkingWidget> with SingleTickerPr
   }
 
   Widget _buildCompactThinking() {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Transform.rotate(
-              angle: _controller.value * 2 * math.pi,
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              widget.text,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: 4),
-            _buildBouncingDots(size: 4),
-          ],
-        );
-      },
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularArcSpinner(
+            size: 18,
+            strokeWidth: 2.5,
+            controller: _controller,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          widget.text,
+          style: AppTypography.caption.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildFullThinkingCard() {
     return GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
       borderRadius: 24,
-      borderColor: AppColors.primary.withValues(alpha: 0.4),
+      borderColor: AppColors.primary.withValues(alpha: 0.35),
       shadows: [
         BoxShadow(
           color: AppColors.primary.withValues(alpha: 0.2),
-          blurRadius: 28,
-          spreadRadius: 2,
+          blurRadius: 24,
+          spreadRadius: 1,
         ),
       ],
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Animated Rotating Neural Orb
-          SizedBox(
-            width: widget.size,
-            height: widget.size,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Outer Pulsing Glow Ring
-                    Transform.scale(
-                      scale: 1.0 + (math.sin(_controller.value * 2 * math.pi) * 0.12),
-                      child: Container(
-                        width: widget.size,
-                        height: widget.size,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary.withValues(alpha: 0.15),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.35),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Rotating Neural Arc 1
-                    Transform.rotate(
-                      angle: _controller.value * 2 * math.pi,
-                      child: CustomPaint(
-                        size: Size(widget.size * 0.85, widget.size * 0.85),
-                        painter: NeuralArcPainter(
-                          color: AppColors.primary,
-                          startAngle: 0,
-                          sweepAngle: math.pi * 1.2,
-                        ),
-                      ),
-                    ),
-
-                    // Counter-Rotating Neural Arc 2
-                    Transform.rotate(
-                      angle: -_controller.value * 2 * math.pi * 1.5,
-                      child: CustomPaint(
-                        size: Size(widget.size * 0.65, widget.size * 0.65),
-                        painter: NeuralArcPainter(
-                          color: AppColors.income,
-                          startAngle: math.pi * 0.5,
-                          sweepAngle: math.pi * 0.8,
-                        ),
-                      ),
-                    ),
-
-                    // Center Glowing Sparkle Icon
-                    Transform.scale(
-                      scale: 0.9 + (math.cos(_controller.value * 2 * math.pi) * 0.15),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: AppColors.primaryGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.5),
-                              blurRadius: 16,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+          CircularArcSpinner(
+            size: widget.size,
+            strokeWidth: 4.5,
+            controller: _controller,
           ),
           const SizedBox(height: 16),
-
-          // Thinking Status Text & Bouncing Wave Dots
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                widget.text,
-                style: AppTypography.labelLarge.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 6),
-              _buildBouncingDots(size: 5),
-            ],
+          Text(
+            widget.text,
+            textAlign: TextAlign.center,
+            style: AppTypography.labelLarge.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildBouncingDots({required double size}) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (index) {
-            final delay = index * 0.2;
-            final animVal = (math.sin((_controller.value + delay) * 2 * math.pi) + 1) / 2;
-            final scale = 0.5 + (animVal * 0.5);
-            final opacity = 0.3 + (animVal * 0.7);
+/// Circular loading spinner: Round element with a thick neutral border,
+/// two adjacent sides (top and right) tinted with accent color to form an arc,
+/// rotating 1turn on a linear infinite loop (~0.8s).
+class CircularArcSpinner extends StatelessWidget {
+  final double size;
+  final double strokeWidth;
+  final Color neutralColor;
+  final Color accentColor;
+  final AnimationController? controller;
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Transform.scale(
-                scale: scale,
-                child: Opacity(
-                  opacity: opacity,
-                  child: Container(
-                    width: size,
-                    height: size,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.primary,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary,
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+  const CircularArcSpinner({
+    super.key,
+    this.size = 56.0,
+    this.strokeWidth = 4.5,
+    this.neutralColor = const Color(0x33FFFFFF),
+    this.accentColor = AppColors.primary,
+    this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller != null) {
+      return AnimatedBuilder(
+        animation: controller!,
+        builder: (context, child) {
+          return Transform.rotate(
+            angle: controller!.value * 2 * math.pi,
+            child: CustomPaint(
+              size: Size(size, size),
+              painter: _ArcSpinnerPainter(
+                strokeWidth: strokeWidth,
+                neutralColor: neutralColor,
+                accentColor: accentColor,
               ),
-            );
-          }),
+            ),
+          );
+        },
+      );
+    }
+
+    return _StandaloneArcSpinner(
+      size: size,
+      strokeWidth: strokeWidth,
+      neutralColor: neutralColor,
+      accentColor: accentColor,
+    );
+  }
+}
+
+class _StandaloneArcSpinner extends StatefulWidget {
+  final double size;
+  final double strokeWidth;
+  final Color neutralColor;
+  final Color accentColor;
+
+  const _StandaloneArcSpinner({
+    required this.size,
+    required this.strokeWidth,
+    required this.neutralColor,
+    required this.accentColor,
+  });
+
+  @override
+  State<_StandaloneArcSpinner> createState() => _StandaloneArcSpinnerState();
+}
+
+class _StandaloneArcSpinnerState extends State<_StandaloneArcSpinner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _ctrl.value * 2 * math.pi,
+          child: CustomPaint(
+            size: Size(widget.size, widget.size),
+            painter: _ArcSpinnerPainter(
+              strokeWidth: widget.strokeWidth,
+              neutralColor: widget.neutralColor,
+              accentColor: widget.accentColor,
+            ),
+          ),
         );
       },
     );
   }
 }
 
-/// Custom Painter drawing smooth glowing neural ring arcs
-class NeuralArcPainter extends CustomPainter {
-  final Color color;
-  final double startAngle;
-  final double sweepAngle;
+class _ArcSpinnerPainter extends CustomPainter {
+  final double strokeWidth;
+  final Color neutralColor;
+  final Color accentColor;
 
-  NeuralArcPainter({
-    required this.color,
-    required this.startAngle,
-    required this.sweepAngle,
+  _ArcSpinnerPainter({
+    required this.strokeWidth,
+    required this.neutralColor,
+    required this.accentColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final paint = Paint()
-      ..color = color
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // 1. Round element with thick neutral border
+    final neutralPaint = Paint()
+      ..color = neutralColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, neutralPaint);
+
+    // 2. Tint two adjacent sides (top & right) the accent color to form an arc
+    final accentPaint = Paint()
+      ..color = accentColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawArc(rect, startAngle, sweepAngle, false, paint);
+    // Start at top (-pi/2) and sweep 90 degrees (pi/2) for top & right adjacent sides
+    canvas.drawArc(rect, -math.pi / 2, math.pi / 2, false, accentPaint);
   }
 
   @override
-  bool shouldRepaint(covariant NeuralArcPainter oldDelegate) {
-    return oldDelegate.color != color ||
-        oldDelegate.startAngle != startAngle ||
-        oldDelegate.sweepAngle != sweepAngle;
+  bool shouldRepaint(covariant _ArcSpinnerPainter oldDelegate) {
+    return oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.neutralColor != neutralColor ||
+        oldDelegate.accentColor != accentColor;
   }
 }

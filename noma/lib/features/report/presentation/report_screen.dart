@@ -206,7 +206,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                 Text('Pengeluaran Berdasarkan Kategori', style: AppTypography.labelLarge),
                 const SizedBox(height: 12),
                 _buildExpenseCategoryPieChart(filteredTransactions, expense),
-                const SizedBox(height: 40),
+                const SizedBox(height: 115),
               ],
             ),
           );

@@ -198,25 +198,23 @@ class LocalAiEngine {
     int balance = 0;
     int income = 0;
     int expense = 0;
+    int monthIncome = 0;
+    int monthExpense = 0;
 
-    final balanceMatch = RegExp(
-      r'Total Saldo:\s*Rp\s*(-?\d+)',
-    ).firstMatch(financialContext);
-    if (balanceMatch != null) {
-      balance = int.tryParse(balanceMatch.group(1)!) ?? 0;
-    }
+    final balanceMatch = RegExp(r'Total Saldo (?:Bersih)?:\s*Rp\s*(-?[\d\.]+)').firstMatch(financialContext);
+    if (balanceMatch != null) balance = int.tryParse(balanceMatch.group(1)!.replaceAll('.', '')) ?? 0;
 
-    final incomeMatch = RegExp(
-      r'Total Pemasukan:\s*Rp\s*(-?\d+)',
-    ).firstMatch(financialContext);
-    if (incomeMatch != null) income = int.tryParse(incomeMatch.group(1)!) ?? 0;
+    final incomeMatch = RegExp(r'Total Pemasukan (?:Keseluruhan)?:\s*Rp\s*(-?[\d\.]+)').firstMatch(financialContext);
+    if (incomeMatch != null) income = int.tryParse(incomeMatch.group(1)!.replaceAll('.', '')) ?? 0;
 
-    final expenseMatch = RegExp(
-      r'Total Pengeluaran:\s*Rp\s*(-?\d+)',
-    ).firstMatch(financialContext);
-    if (expenseMatch != null) {
-      expense = int.tryParse(expenseMatch.group(1)!) ?? 0;
-    }
+    final expenseMatch = RegExp(r'Total Pengeluaran (?:Keseluruhan)?:\s*Rp\s*(-?[\d\.]+)').firstMatch(financialContext);
+    if (expenseMatch != null) expense = int.tryParse(expenseMatch.group(1)!.replaceAll('.', '')) ?? 0;
+
+    final monthIncMatch = RegExp(r'Pemasukan Bulan Ini:\s*Rp\s*(-?[\d\.]+)').firstMatch(financialContext);
+    if (monthIncMatch != null) monthIncome = int.tryParse(monthIncMatch.group(1)!.replaceAll('.', '')) ?? 0;
+
+    final monthExpMatch = RegExp(r'Pengeluaran Bulan Ini:\s*Rp\s*(-?[\d\.]+)').firstMatch(financialContext);
+    if (monthExpMatch != null) monthExpense = int.tryParse(monthExpMatch.group(1)!.replaceAll('.', '')) ?? 0;
 
     if (_containsSensitiveDataRequest(lower)) {
       return 'Aku tidak bisa meminta atau memproses data sensitif seperti PIN, OTP, password, NIK, nomor kartu, CVV, atau nomor rekening penuh.\n\n'
@@ -238,9 +236,30 @@ class LocalAiEngine {
           'Coba tanyakan tentang saldo, pengeluaran, pemasukan, kategori terbesar, budgeting, atau tips hemat berdasarkan transaksi kamu.';
     }
 
-    if (lower.contains('saldo') ||
-        lower.contains('uangku') ||
-        lower.contains('uang saya')) {
+    if (lower.contains('kategori') || lower.contains('terbesar') || lower.contains('terbanyak')) {
+      final catStartIndex = financialContext.indexOf('Pengeluaran Berdasarkan Kategori');
+      if (catStartIndex != -1) {
+        final catEndIndex = financialContext.indexOf('5 Transaksi Terakhir', catStartIndex);
+        final catBlock = catEndIndex != -1
+            ? financialContext.substring(catStartIndex, catEndIndex)
+            : financialContext.substring(catStartIndex);
+
+        return '**Top Pengeluaran Berdasarkan Kategori:**\n\n'
+            '${catBlock.replaceAll('Pengeluaran Berdasarkan Kategori (Urut Terbesar):', '').trim()}\n\n'
+            'Evaluasi kategori dengan porsi pengeluaran terbesar untuk meningkatkan potensi tabunganmu!';
+      }
+    }
+
+    if (lower.contains('terakhir') || lower.contains('riwayat') || lower.contains('terbaru')) {
+      final recentStartIndex = financialContext.indexOf('5 Transaksi Terakhir:');
+      if (recentStartIndex != -1) {
+        final recentBlock = financialContext.substring(recentStartIndex);
+        return '**Catatan 5 Transaksi Terakhir:**\n\n'
+            '${recentBlock.replaceAll('5 Transaksi Terakhir:', '').trim()}';
+      }
+    }
+
+    if (lower.contains('saldo') || lower.contains('uangku') || lower.contains('uang saya')) {
       return '**Total Saldo Anda Saat Ini:**\n'
           'Rp ${_formatRupiah(balance)}\n\n'
           '• Total Pemasukan: Rp ${_formatRupiah(income)}\n'
@@ -248,26 +267,26 @@ class LocalAiEngine {
           '${balance >= 0 ? "Keuangan Anda dalam kondisi positif! Tetap pertahankan penghematan." : "Perhatian: Total pengeluaran Anda melebihi pemasukan."}';
     }
 
-    if (lower.contains('pengeluaran') ||
-        lower.contains('keluar') ||
-        lower.contains('habis')) {
+    if (lower.contains('bulan ini')) {
+      return '**Ringkasan Keuangan Bulan Ini:**\n\n'
+          '• Pemasukan Bulan Ini: **Rp ${_formatRupiah(monthIncome > 0 ? monthIncome : income)}**\n'
+          '• Pengeluaran Bulan Ini: **Rp ${_formatRupiah(monthExpense > 0 ? monthExpense : expense)}**\n\n'
+          'Selisih bulan ini: **Rp ${_formatRupiah((monthIncome > 0 ? monthIncome : income) - (monthExpense > 0 ? monthExpense : expense))}**';
+    }
+
+    if (lower.contains('pengeluaran') || lower.contains('keluar') || lower.contains('habis')) {
       return '**Ringkasan Pengeluaran:**\n'
           'Total pengeluaran Anda saat ini adalah **Rp ${_formatRupiah(expense)}**.\n\n'
           '${expense > 0 ? "Pastikan Anda mencatat setiap detail transaksi harian agar arus kas tetap terkontrol dengan baik." : "Belum ada pengeluaran yang tercatat untuk periode ini."}';
     }
 
-    if (lower.contains('pemasukan') ||
-        lower.contains('masuk') ||
-        lower.contains('gaji')) {
+    if (lower.contains('pemasukan') || lower.contains('masuk') || lower.contains('gaji')) {
       return '**Ringkasan Pemasukan:**\n'
           'Total pemasukan yang tercatat sejauh ini adalah **Rp ${_formatRupiah(income)}**.\n\n'
           'Alokasikan setidaknya 20% dari pemasukan untuk tabungan atau dana darurat!';
     }
 
-    if (lower.contains('saran') ||
-        lower.contains('hemat') ||
-        lower.contains('tips') ||
-        lower.contains('solusi')) {
+    if (lower.contains('saran') || lower.contains('hemat') || lower.contains('tips') || lower.contains('solusi')) {
       return '**Tips & Saran Penghematan Keuangan Nomi:**\n\n'
           '1. **Aturan 50/30/20:** Alokasikan 50% untuk kebutuhan pokok, 30% untuk keinginan, dan 20% untuk tabungan/investasi.\n'
           '2. **Evaluasi Pengeluaran Makanan & Jajan:** Batasi pembelian kopi/makanan pesan-antar yang sering jadi *leaky budget*.\n'
@@ -276,7 +295,7 @@ class LocalAiEngine {
 
     if (_isGreeting(lower)) {
       return 'Halo! Saya **Nomi**, asisten keuangan pribadi Anda.\n\n'
-          'Saya bisa membantu menganalisis saldo, pengeluaran, pemasukan, budgeting, dan tips penghematan berdasarkan data Noma. Ada yang mau dicek?';
+          'Saya bisa membantu menganalisis saldo, pengeluaran, pemasukan, kategori terbesar, dan tips penghematan berdasarkan data Noma. Ada yang mau dicek?';
     }
 
     return 'Terima kasih atas pertanyaannya!\n\n'
@@ -284,7 +303,7 @@ class LocalAiEngine {
         '• **Saldo:** Rp ${_formatRupiah(balance)}\n'
         '• **Pemasukan:** Rp ${_formatRupiah(income)}\n'
         '• **Pengeluaran:** Rp ${_formatRupiah(expense)}\n\n'
-        'Anda dapat bertanya kepada saya tentang *"Berapa saldo saya?"*, *"Berapa pengeluaranku?"*, atau *"Beri saran penghematan"*!';
+        'Anda dapat bertanya tentang *"Berapa saldo saya?"*, *"Kategori terbesar?"*, *"Transaksi terakhir"*, atau *"Beri saran hemat"*!';
   }
 
   static bool _containsSensitiveDataRequest(String text) {

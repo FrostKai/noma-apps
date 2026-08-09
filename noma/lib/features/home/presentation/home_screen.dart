@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_images.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/constants/product_tour_keys.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../shared/widgets/glass_button.dart';
 import '../../../shared/widgets/glass_card.dart';
+import '../../main_shell/presentation/main_shell_screen.dart';
 import '../../transaction/presentation/add_transaction_screen.dart';
 import '../../transaction/presentation/providers/transaction_provider.dart';
 import '../../transaction/presentation/widgets/ai_smart_input_card.dart';
@@ -37,6 +40,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final expenseAsync = ref.watch(totalExpenseStreamProvider);
     final recentTxAsync = ref.watch(allTransactionsStreamProvider);
 
+    const tourTooltipBg = Color(0xE61A1A2E);
+    const tourTitleStyle = TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+    );
+    const tourDescStyle = TextStyle(
+      color: Color(0xD9FFFFFF),
+      fontSize: 13,
+      height: 1.4,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -57,19 +72,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(height: 20),
 
                 // Glass Balance Card (Real-time Stream)
-                _buildBalanceCard(balanceAsync, incomeAsync, expenseAsync),
+                Showcase(
+                  key: ProductTourKeys.balanceCard,
+                  title: 'Saldo Utama',
+                  description:
+                      'Selamat datang di Noma! Ini ringkasan saldo, pemasukan & pengeluaran Anda.',
+                  targetBorderRadius: BorderRadius.circular(24),
+                  targetPadding: const EdgeInsets.all(4),
+                  tooltipBackgroundColor: tourTooltipBg,
+                  titleTextStyle: tourTitleStyle,
+                  descTextStyle: tourDescStyle,
+                  child: _buildBalanceCard(
+                    balanceAsync,
+                    incomeAsync,
+                    expenseAsync,
+                  ),
+                ),
                 const SizedBox(height: 20),
 
                 // Donut Chart + 7-Day Mini Bar Chart Card
-                const DashboardChartCard(),
+                Showcase(
+                  key: ProductTourKeys.dashboardChart,
+                  title: 'Grafik Keuangan',
+                  description:
+                      'Pantau distribusi pengeluaran dan perbandingan 7 hari terakhir.',
+                  targetBorderRadius: BorderRadius.circular(24),
+                  targetPadding: const EdgeInsets.all(4),
+                  tooltipBackgroundColor: tourTooltipBg,
+                  titleTextStyle: tourTitleStyle,
+                  descTextStyle: tourDescStyle,
+                  child: const DashboardChartCard(),
+                ),
                 const SizedBox(height: 20),
 
                 // AI Natural Language Smart Input Card
-                const AiSmartInputCard(),
+                Showcase(
+                  key: ProductTourKeys.aiSmartInput,
+                  title: 'Input AI Cerdas',
+                  description:
+                      'Setelah API key aktif, ketik transaksi dengan bahasa alami!\nContoh: "Beli kopi 25rb".',
+                  targetBorderRadius: BorderRadius.circular(20),
+                  targetPadding: const EdgeInsets.all(4),
+                  tooltipBackgroundColor: tourTooltipBg,
+                  titleTextStyle: tourTitleStyle,
+                  descTextStyle: tourDescStyle,
+                  child: const AiSmartInputCard(),
+                ),
                 const SizedBox(height: 20),
 
                 // Quick Action Glass Chips
-                _buildQuickActions(context),
+                Showcase(
+                  key: ProductTourKeys.quickActions,
+                  title: 'Aksi Cepat',
+                  description:
+                      'Akses cepat ke fitur utama: Tambah, Scan Struk, Nomi AI, dan Laporan.',
+                  targetBorderRadius: BorderRadius.circular(16),
+                  targetPadding: const EdgeInsets.all(4),
+                  tooltipBackgroundColor: tourTooltipBg,
+                  titleTextStyle: tourTitleStyle,
+                  descTextStyle: tourDescStyle,
+                  child: _buildQuickActions(context),
+                ),
                 const SizedBox(height: 28),
 
                 // Recent Transactions Header & Search/Filter
@@ -77,7 +140,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(height: 12),
 
                 // Search & Filter Bar
-                _buildSearchAndFilterBar(),
+                Showcase(
+                  key: ProductTourKeys.recentTx,
+                  title: 'Riwayat Transaksi',
+                  description:
+                      'Semua transaksi tercatat di sini.\nGunakan pencarian dan filter untuk menemukan transaksi.',
+                  targetBorderRadius: BorderRadius.circular(16),
+                  targetPadding: const EdgeInsets.all(4),
+                  tooltipBackgroundColor: tourTooltipBg,
+                  titleTextStyle: tourTitleStyle,
+                  descTextStyle: tourDescStyle,
+                  child: _buildSearchAndFilterBar(),
+                ),
                 const SizedBox(height: 16),
 
                 // Recent Transactions List (Filtered Real-time Stream)
@@ -97,7 +171,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         Image.asset(
           AppImages.logoWordmark,
-          height: 32,
+          height: 38,
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) =>
               Text('Noma', style: AppTypography.headingLarge),
@@ -106,7 +180,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.all(10),
           borderRadius: 12,
           onTap: () {
-            context.push(AppRoutes.settings);
+            ref.read(activeTabProvider.notifier).state = 3;
           },
           child: const Icon(
             Icons.settings_outlined,

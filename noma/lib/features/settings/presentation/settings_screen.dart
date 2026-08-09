@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_images.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/constants/product_tour_keys.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/product_tour_service.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/ai_key_setup_modal.dart';
 import '../../../shared/widgets/glass_button.dart';
@@ -24,6 +27,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notificationEnabled = false;
   TimeOfDay _notificationTime = const TimeOfDay(hour: 20, minute: 0);
   bool _isSavingNotification = false;
+  bool _isTestingNotification = false;
 
   @override
   void initState() {
@@ -48,6 +52,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const tourTooltipBg = Color(0xE61A1A2E);
+    const tourTitleStyle = TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+    );
+    const tourDescStyle = TextStyle(
+      color: Color(0xD9FFFFFF),
+      fontSize: 13,
+      height: 1.4,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -67,19 +83,304 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           // Category Management Menu
+          Showcase(
+            key: ProductTourKeys.settingsCategory,
+            title: 'Manajemen Kategori',
+            description:
+                'Atur kategori pemasukan & pengeluaran sesuai kebutuhan Anda.',
+            targetBorderRadius: BorderRadius.circular(20),
+            targetPadding: const EdgeInsets.all(4),
+            tooltipBackgroundColor: tourTooltipBg,
+            titleTextStyle: tourTitleStyle,
+            descTextStyle: tourDescStyle,
+            child: GlassCard(
+              onTap: () => context.push(AppRoutes.categories),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.category_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Manajemen Kategori',
+                          style: AppTypography.labelLarge,
+                        ),
+                        Text(
+                          'Atur kategori pemasukan & pengeluaran',
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Daily Night Notification Section
+          Text('Notifikasi & Pengingat', style: AppTypography.labelMedium),
+          const SizedBox(height: 8),
+          Showcase(
+            key: ProductTourKeys.settingsNotification,
+            title: 'Pengingat Harian',
+            description:
+                'Aktifkan notifikasi harian agar tidak lupa mencatat transaksi.',
+            targetBorderRadius: BorderRadius.circular(20),
+            targetPadding: const EdgeInsets.all(4),
+            tooltipBackgroundColor: tourTooltipBg,
+            titleTextStyle: tourTitleStyle,
+            descTextStyle: tourDescStyle,
+            child: GlassCard(
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.notifications_active_rounded,
+                          color: AppColors.warning,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pengingat Catat Harian',
+                              style: AppTypography.labelLarge,
+                            ),
+                            Text(
+                              _notificationEnabled
+                                  ? 'Noma akan mengingatkan kamu setiap hari jam ${_formatTime(_notificationTime)}'
+                                  : 'Aktifkan agar tidak lupa mencatat transaksi',
+                              style: AppTypography.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _notificationEnabled,
+                        activeTrackColor: AppColors.primary,
+                        onChanged: _isSavingNotification
+                            ? null
+                            : (val) => _setNotificationEnabled(val),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: AppColors.glassBorder),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: _isSavingNotification ? null : _pickNotificationTime,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.background.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.glassBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Jam Pengingat',
+                                  style: AppTypography.labelLarge,
+                                ),
+                                Text(
+                                  'Ketuk untuk mengubah waktu notifikasi harian',
+                                  style: AppTypography.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            _formatTime(_notificationTime),
+                            style: AppTypography.headingSmall.copyWith(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  GlassButton(
+                    label: _isTestingNotification
+                        ? 'Mengirim...'
+                        : 'Uji Coba Notifikasi Sekarang',
+                    icon: Icons.notifications_none_rounded,
+                    variant: GlassButtonVariant.outline,
+                    height: 42,
+                    isLoading: _isTestingNotification,
+                    onPressed: _isTestingNotification
+                        ? null
+                        : () async {
+                            if (kIsWeb) {
+                              _showSnackBar(
+                                'Notifikasi tidak didukung di web. Coba di perangkat Android.',
+                                isError: true,
+                              );
+                              return;
+                            }
+                            setState(() {
+                              _isTestingNotification = true;
+                            });
+                            try {
+                              await NotificationService.showDailyReminderNow();
+                              _showSnackBar(
+                                'Notifikasi uji coba dikirim! Cek tray notifikasi HP.',
+                              );
+                            } catch (_) {
+                              _showSnackBar(
+                                'Gagal menguji notifikasi.',
+                                isError: true,
+                              );
+                            } finally {
+                              Future.delayed(
+                                const Duration(milliseconds: 1500),
+                                () {
+                                  if (mounted) {
+                                    setState(() {
+                                      _isTestingNotification = false;
+                                    });
+                                  }
+                                },
+                              );
+                            }
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // AI Integration Info & API Key Setup
+          Text('Kecerdasan Buatan (AI)', style: AppTypography.labelMedium),
+          const SizedBox(height: 8),
+          Showcase(
+            key: ProductTourKeys.settingsAiKey,
+            title: 'Setup API Key AI (100% Gratis)',
+            description:
+                'Di sini tempat memasukkan Kunci AI (100% Gratis).\n\n'
+                'Tekan "Berikutnya" untuk membuka jendela pengaturan dan panduan pengambilannya!',
+            tooltipPosition: TooltipPosition.top,
+            targetBorderRadius: BorderRadius.circular(20),
+            targetPadding: const EdgeInsets.all(4),
+            tooltipBackgroundColor: tourTooltipBg,
+            titleTextStyle: tourTitleStyle,
+            descTextStyle: tourDescStyle,
+            child: GlassCard(
+              onTap: () => AiKeySetupModal.show(context),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.income.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: AppColors.income,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Groq Cloud AI (Llama 3.3 70B)',
+                          style: AppTypography.labelLarge,
+                        ),
+                        Text(
+                          'Ketuk untuk atur API Key gratis',
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.income.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.income),
+                    ),
+                    child: Text(
+                      'Atur Key',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.income,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Help & Product Tour Repeat
+          Text('Bantuan', style: AppTypography.labelMedium),
+          const SizedBox(height: 8),
           GlassCard(
-            onTap: () => context.push(AppRoutes.categories),
+            onTap: () async {
+              await ProductTourService.resetTour();
+              ref.read(productTourTriggerProvider.notifier).state++;
+            },
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: AppColors.info.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.category_rounded,
-                    color: AppColors.primary,
+                    Icons.help_outline_rounded,
+                    color: AppColors.info,
                     size: 20,
                   ),
                 ),
@@ -89,11 +390,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Manajemen Kategori',
+                        'Ulangi Tur Aplikasi',
                         style: AppTypography.labelLarge,
                       ),
                       Text(
-                        'Atur kategori pemasukan & pengeluaran',
+                        'Tampilkan panduan fitur aplikasi lagi',
                         style: AppTypography.caption,
                       ),
                     ],
@@ -102,193 +403,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Icon(
                   Icons.chevron_right_rounded,
                   color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Daily Night Notification Section
-          Text('Notifikasi & Pengingat', style: AppTypography.labelMedium),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.notifications_active_rounded,
-                        color: AppColors.warning,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pengingat Catat Harian',
-                            style: AppTypography.labelLarge,
-                          ),
-                          Text(
-                            _notificationEnabled
-                                ? 'Noma akan mengingatkan kamu setiap hari jam ${_formatTime(_notificationTime)}'
-                                : 'Aktifkan agar tidak lupa mencatat transaksi',
-                            style: AppTypography.caption,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch(
-                      value: _notificationEnabled,
-                      activeTrackColor: AppColors.primary,
-                      onChanged: _isSavingNotification
-                          ? null
-                          : (val) => _setNotificationEnabled(val),
-                    ),
-                  ],
-                ),
-                const Divider(color: AppColors.glassBorder),
-                const SizedBox(height: 8),
-                InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: _isSavingNotification ? null : _pickNotificationTime,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.background.withValues(alpha: 0.28),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.glassBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.schedule_rounded,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Jam Pengingat',
-                                style: AppTypography.labelLarge,
-                              ),
-                              Text(
-                                'Ketuk untuk mengubah waktu notifikasi harian',
-                                style: AppTypography.caption,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          _formatTime(_notificationTime),
-                          style: AppTypography.headingSmall.copyWith(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                GlassButton(
-                  label: 'Uji Coba Notifikasi Sekarang',
-                  icon: Icons.notifications_none_rounded,
-                  variant: GlassButtonVariant.outline,
-                  height: 42,
-                  onPressed: () async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    if (kIsWeb) {
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Notifikasi tidak didukung di web. Coba di perangkat Android.',
-                          ),
-                          backgroundColor: AppColors.expense,
-                        ),
-                      );
-                      return;
-                    }
-                    await NotificationService.showDailyReminderNow();
-                    messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Notifikasi uji coba dikirim! Cek tray notifikasi HP.',
-                        ),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // AI Integration Info & API Key Setup
-          Text('Kecerdasan Buatan (AI)', style: AppTypography.labelMedium),
-          const SizedBox(height: 8),
-          GlassCard(
-            onTap: () => AiKeySetupModal.show(context),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.income.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    color: AppColors.income,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Groq Cloud AI (Llama 3.3 70B)',
-                        style: AppTypography.labelLarge,
-                      ),
-                      Text(
-                        'Ketuk untuk atur API Key gratis',
-                        style: AppTypography.caption,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.income.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.income),
-                  ),
-                  child: Text(
-                    'Atur Key',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.income,
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -304,14 +418,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Image.asset(
                     AppImages.logoIcon,
-                    width: 54,
-                    height: 54,
+                    width: 68,
+                    height: 68,
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 10),
                   Image.asset(
                     AppImages.logoWordmark,
-                    height: 24,
+                    height: 32,
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 6),
@@ -330,7 +444,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 80),
+          const SizedBox(height: 115),
         ],
       ),
     );
@@ -453,9 +567,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message),
+        duration: const Duration(milliseconds: 1800),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         backgroundColor: isError ? AppColors.expense : AppColors.primary,
       ),
     );

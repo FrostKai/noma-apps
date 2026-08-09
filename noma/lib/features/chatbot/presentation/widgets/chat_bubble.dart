@@ -15,6 +15,65 @@ class ChatBubble extends StatelessWidget {
     required this.timestamp,
   });
 
+  Widget _buildFormattedText(String text) {
+    final spans = <InlineSpan>[];
+    final regex = RegExp(r'\*\*(.*?)\*\*|\*(.*?)\*|`(.*?)`');
+    int lastMatchEnd = 0;
+
+    final baseStyle = AppTypography.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      height: 1.4,
+    );
+
+    for (final match in regex.allMatches(text)) {
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastMatchEnd, match.start),
+          style: baseStyle,
+        ));
+      }
+
+      if (match.group(1) != null) {
+        // Bold **text**
+        spans.add(TextSpan(
+          text: match.group(1),
+          style: baseStyle.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isUser ? AppColors.textPrimary : AppColors.primary,
+          ),
+        ));
+      } else if (match.group(2) != null) {
+        // Italic *text*
+        spans.add(TextSpan(
+          text: match.group(2),
+          style: baseStyle.copyWith(fontStyle: FontStyle.italic),
+        ));
+      } else if (match.group(3) != null) {
+        // Code `text`
+        spans.add(TextSpan(
+          text: match.group(3),
+          style: AppTypography.caption.copyWith(
+            color: AppColors.primary,
+            fontFamily: 'monospace',
+            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+          ),
+        ));
+      }
+      lastMatchEnd = match.end;
+    }
+
+    if (lastMatchEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastMatchEnd),
+        style: baseStyle,
+      ));
+    }
+
+    return Text.rich(
+      TextSpan(children: spans),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -51,6 +110,7 @@ class ChatBubble extends StatelessWidget {
                   ? AppColors.glassBorder
                   : AppColors.primary.withValues(alpha: 0.4),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment:
                     isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
@@ -64,12 +124,7 @@ class ChatBubble extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  Text(
-                    message,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+                  _buildFormattedText(message),
                 ],
               ),
             ),
@@ -80,3 +135,4 @@ class ChatBubble extends StatelessWidget {
     );
   }
 }
+

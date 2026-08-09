@@ -159,8 +159,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               ],
                               child: Image.asset(
                                 AppImages.logoIcon,
-                                width: 84,
-                                height: 84,
+                                width: 96,
+                                height: 96,
                                 fit: BoxFit.contain,
                                 errorBuilder: (context, error, stackTrace) => const Icon(
                                   Icons.account_balance_wallet_rounded,
@@ -182,7 +182,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         children: [
                           Image.asset(
                             AppImages.logoWordmark,
-                            height: 44,
+                            height: 52,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => Text(
                               AppConstants.appName,

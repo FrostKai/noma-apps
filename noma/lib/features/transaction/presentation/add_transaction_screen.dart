@@ -127,7 +127,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
     final controller = ref.read(transactionControllerProvider.notifier);
 
-    if (widget.initialTransaction != null) {
+    final isActualEdit = widget.initialTransaction != null && widget.initialTransaction!.id != 0;
+
+    if (isActualEdit) {
       final updated = widget.initialTransaction!.copyWith(
         type: _type,
         amount: amount,
@@ -141,11 +143,13 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         Navigator.of(context).pop();
       }
     } else {
+      final source = widget.initialTransaction?.source ?? 'manual';
       final success = await controller.addTransaction(
         type: _type,
         amount: amount,
         category: _selectedCategory!,
         description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+        source: source,
         paymentMethod: _selectedPaymentMethod,
         transactionDate: _selectedDate,
       );
@@ -157,7 +161,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isEdit = widget.initialTransaction != null;
+    final isEdit = widget.initialTransaction != null && widget.initialTransaction!.id != 0;
     final state = ref.watch(transactionControllerProvider);
     final categoriesAsync = _type == 'income'
         ? ref.watch(incomeCategoriesStreamProvider)

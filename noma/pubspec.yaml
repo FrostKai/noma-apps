@@ -50,6 +50,7 @@ dependencies:
   url_launcher: ^6.3.2
   shared_preferences: ^2.5.5
   timezone: ^0.9.4
+  showcaseview: ^5.1.0
 
 dev_dependencies:
   flutter_test:
