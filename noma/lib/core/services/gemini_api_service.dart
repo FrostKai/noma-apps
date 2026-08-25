@@ -212,20 +212,10 @@ Aturan Penting:
 ''';
 
     final base64Image = base64Encode(imageBytes);
-    debugPrint('=== [RECEIPT SCAN DEBUG] START ===');
-    debugPrint(
-      '[RECEIPT SCAN DEBUG] Image byte size: ${imageBytes.length} bytes',
-    );
-    debugPrint(
-      '[RECEIPT SCAN DEBUG] Base64 string length: ${base64Image.length}',
-    );
+    debugPrint('Receipt parsing started. imageBytes=${imageBytes.length}');
 
     try {
       final apiKey = await _getGeminiVisionApiKey();
-      final maskedKey = apiKey.length > 8
-          ? '${apiKey.substring(0, 6)}...'
-          : 'EMPTY';
-      debugPrint('[RECEIPT SCAN DEBUG] Using Gemini API Key: $maskedKey');
 
       final payload = {
         'system_instruction': {
@@ -252,17 +242,11 @@ Aturan Penting:
         },
       };
 
-      debugPrint(
-        '[RECEIPT SCAN DEBUG] Sending payload to Gemini API. System instruction included: ${payload.containsKey('system_instruction')}',
-      );
       final response = await _postPayloadWithFallback(
         payload,
         apiKey,
         endpoints: _visionEndpoints,
         preferFirstRetryableError: true,
-      );
-      debugPrint(
-        '[RECEIPT SCAN DEBUG] Gemini API Response HTTP Status: ${response.statusCode}',
       );
 
       final candidates = response.data['candidates'] as List?;
@@ -271,31 +255,23 @@ Aturan Penting:
         final parts = content['parts'] as List?;
         if (parts != null && parts.isNotEmpty) {
           final rawText = parts.first['text'] as String;
-          debugPrint(
-            '[RECEIPT SCAN DEBUG] Raw Response Text from Gemini:\n$rawText',
-          );
           final jsonString = _cleanJsonString(rawText);
-          debugPrint('[RECEIPT SCAN DEBUG] Cleaned JSON String:\n$jsonString');
           final parsedJson = jsonDecode(jsonString) as Map<String, dynamic>;
-          debugPrint(
-            '[RECEIPT SCAN DEBUG] Successfully parsed JSON Map: $parsedJson',
-          );
+          debugPrint('Receipt parsing completed.');
           return parsedJson;
         }
       }
-      debugPrint(
-        '[RECEIPT SCAN DEBUG] Response candidates missing or empty: ${response.data}',
-      );
+      debugPrint('Receipt parsing failed: empty response.');
       throw Exception(
         'Gagal mendapatkan respon pemindaian dari Cloud AI Vision',
       );
     } on DioException catch (e) {
       debugPrint(
-        '[RECEIPT SCAN DEBUG] DioException caught: statusCode=${e.response?.statusCode}, data=${e.response?.data}, error=${e.error}',
+        'Receipt parsing failed: status=${e.response?.statusCode}, type=${e.type}',
       );
       throw Exception(_extractDioErrorMessage(e));
-    } catch (e, stack) {
-      debugPrint('[RECEIPT SCAN DEBUG] General Exception caught: $e\n$stack');
+    } catch (e) {
+      debugPrint('Receipt parsing failed: ${e.runtimeType}');
       final err = e.toString().replaceAll('Exception: ', '');
       if (err.contains('API Key') && err.contains('belum diisi')) {
         rethrow;
@@ -362,7 +338,8 @@ Batasan wajib:
       });
     }
 
-    if (contents.isEmpty || (contents.last['parts'] as List).first['text'] != userMessage) {
+    if (contents.isEmpty ||
+        (contents.last['parts'] as List).first['text'] != userMessage) {
       contents.add({
         'role': 'user',
         'parts': [
@@ -587,7 +564,7 @@ Batasan wajib:
       } on DioException catch (e) {
         lastException = e;
         debugPrint(
-          'Gemini endpoint $endpoint failed: ${e.response?.statusCode} - ${e.response?.data}',
+          'Gemini endpoint failed: status=${e.response?.statusCode}, type=${e.type}',
         );
 
         final data = e.response?.data;

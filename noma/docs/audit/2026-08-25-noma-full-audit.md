@@ -646,3 +646,54 @@ Performance smoke query setelah phase ini:
 | 1,000 | 458us | 171us | 226us | uses `idx_transactions_date_id` |
 | 10,000 | 332us | 287us | 748us | uses `idx_transactions_date_id` |
 | 50,000 | 306us | 376us | 606us | uses `idx_transactions_date_id` |
+
+## Follow-up Implementation: Receipt Scanner & Transaction Items
+
+Tanggal implementasi: 2026-08-25
+
+Perubahan yang sudah dilakukan:
+- `transaction_items` tetap dipertahankan sebagai data pendukung report item struk.
+- Review hasil scan sekarang memprioritaskan merchant, tanggal, total, dan kategori.
+- Detail item dipindahkan ke modal `Lihat/Edit Item`, sehingga user tidak wajib membuka item untuk menyimpan transaksi.
+- User dapat menambah, mengedit, dan menghapus item struk sebelum transaksi disimpan.
+- Edit item mendukung nama barang, quantity, harga satuan, dan total.
+- Total transaksi tetap memakai total utama struk; jika total item berbeda, UI menampilkan warning selisih.
+- Save transaksi + item memakai operasi atomic di repository.
+- Delete transaksi sekarang eksplisit membersihkan `transaction_items` dalam transaction database untuk mencegah orphan item.
+- Query report `Barang Paling Banyak Menghabiskan Uang` tetap memakai aggregate join, bukan N+1.
+- Histori/dashboard tetap tidak memuat `transaction_items` atau gambar struk.
+- Debug log receipt AI disanitasi agar tidak mencetak raw response, JSON struk, merchant, item, total, base64 gambar, atau API key.
+
+Bottleneck sebelum:
+- Hasil item scan langsung tampil sebagai list inline di bottom sheet review.
+- Perubahan item tidak memberi warning ketika total item berbeda dari total transaksi.
+- Log scanner mencetak raw response dan JSON hasil struk.
+- Delete transaction mengandalkan cascade FK saja; test memory SQLite menunjukkan item bisa tertinggal.
+
+Bottleneck setelah:
+- Item detail hanya dibuka saat user memilih `Lihat/Edit Item`.
+- Consistency total terlihat jelas, tanpa auto-correction tersembunyi.
+- Data struk tidak lagi dicetak ke debug log.
+- Cleanup item saat delete tidak bergantung pada setting FK runtime.
+
+Performance smoke query setelah phase ini:
+
+| Rows | Monthly Page 1 | Monthly Page 2 | Top Receipt Items | Detail Items | EXPLAIN |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 1,000 | 425us | 197us | 224us | 403us | uses `idx_transactions_date_id` |
+| 10,000 | 348us | 316us | 359us | 125us | uses `idx_transactions_date_id` |
+| 50,000 | 373us | 350us | 2410us | 172us | uses `idx_transactions_date_id` |
+| 100,000 | 405us | 381us | 5544us | 54us | uses `idx_transactions_date_id` |
+
+Validation setelah implementasi:
+
+```text
+flutter analyze
+No issues found.
+
+flutter test
+All tests passed.
+```
+
+Catatan:
+- Profiling frame/raster scanner di Android belum diukur karena tidak ada device/emulator profiling aktif pada tahap ini.

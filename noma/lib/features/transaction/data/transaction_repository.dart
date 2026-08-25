@@ -103,6 +103,11 @@ abstract class ITransactionRepository {
     TransactionsCompanion transaction, {
     List<TransactionItemInput> items,
   });
+  Future<List<TransactionItem>> getTransactionItems(int transactionId);
+  Future<void> replaceTransactionItems(
+    int transactionId,
+    List<TransactionItemInput> items,
+  );
   Future<bool> updateTransaction(Transaction transaction);
   Future<int> deleteTransaction(int id);
 }
@@ -522,24 +527,57 @@ class TransactionRepository implements ITransactionRepository {
           .into(_db.transactions)
           .insert(transaction);
       if (items.isNotEmpty) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        await _db.batch((batch) {
-          batch.insertAll(
-            _db.transactionItems,
-            items.map((item) {
-              return TransactionItemsCompanion.insert(
-                transactionId: transactionId,
-                name: item.name,
-                quantity: Value(item.quantity),
-                unitPrice: Value(item.unitPrice),
-                totalPrice: item.totalPrice,
-                createdAt: now,
-              );
-            }).toList(),
-          );
-        });
+        await _insertTransactionItems(transactionId, items);
       }
       return transactionId;
+    });
+  }
+
+  @override
+  Future<List<TransactionItem>> getTransactionItems(int transactionId) {
+    return (_db.select(_db.transactionItems)
+          ..where((t) => t.transactionId.equals(transactionId))
+          ..orderBy([(t) => OrderingTerm.asc(t.id)]))
+        .get();
+  }
+
+  @override
+  Future<void> replaceTransactionItems(
+    int transactionId,
+    List<TransactionItemInput> items,
+  ) {
+    return _db.transaction(() async {
+      await (_db.delete(
+        _db.transactionItems,
+      )..where((t) => t.transactionId.equals(transactionId))).go();
+      if (items.isNotEmpty) {
+        await _insertTransactionItems(transactionId, items);
+      }
+    });
+  }
+
+  Future<void> _insertTransactionItems(
+    int transactionId,
+    List<TransactionItemInput> items,
+  ) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final companions = items.map((item) {
+      final name = item.name.trim();
+      if (name.isEmpty || item.quantity <= 0 || item.totalPrice <= 0) {
+        throw ArgumentError('Item struk tidak valid.');
+      }
+      return TransactionItemsCompanion.insert(
+        transactionId: transactionId,
+        name: name,
+        quantity: Value(item.quantity),
+        unitPrice: Value(item.unitPrice),
+        totalPrice: item.totalPrice,
+        createdAt: now,
+      );
+    }).toList();
+
+    await _db.batch((batch) {
+      batch.insertAll(_db.transactionItems, companions);
     });
   }
 
@@ -550,6 +588,11 @@ class TransactionRepository implements ITransactionRepository {
 
   @override
   Future<int> deleteTransaction(int id) {
-    return (_db.delete(_db.transactions)..where((t) => t.id.equals(id))).go();
+    return _db.transaction(() async {
+      await (_db.delete(
+        _db.transactionItems,
+      )..where((t) => t.transactionId.equals(id))).go();
+      return (_db.delete(_db.transactions)..where((t) => t.id.equals(id))).go();
+    });
   }
 }

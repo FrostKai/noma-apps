@@ -14,6 +14,7 @@ import '../../../shared/widgets/ai_key_setup_modal.dart';
 import '../../../shared/widgets/ai_thinking_widget.dart';
 import '../../../shared/widgets/glass_button.dart';
 import '../../../shared/widgets/glass_card.dart';
+import '../domain/receipt_review_utils.dart';
 import '../../transaction/data/transaction_repository.dart';
 import '../../transaction/presentation/providers/transaction_provider.dart';
 
@@ -110,7 +111,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     } catch (e) {
       if (!mounted) return;
       final userMessage = _friendlyScanErrorMessage(e);
-      debugPrint('Receipt scan failed: $e');
+      debugPrint('Receipt scan failed: ${e.runtimeType}');
 
       setState(() {
         _isScanning = false;
@@ -165,74 +166,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   String? _validateScanResult(Map<String, dynamic> result) {
-    final aiError = result['error'];
-    if (aiError is String && aiError.trim().isNotEmpty) {
-      return aiError;
-    }
-
-    final total = _extractTotalAmount(result);
-    if (total <= 0) {
-      return 'Total struk tidak terbaca. Silakan scan ulang dengan foto yang lebih jelas atau input manual.';
-    }
-
-    return null;
-  }
-
-  double _parseAmount(dynamic val) {
-    if (val == null) return 0.0;
-    if (val is num) return val.toDouble();
-    if (val is String) {
-      final cleaned = val.replaceAll(RegExp(r'[^\d]'), '');
-      return double.tryParse(cleaned) ?? 0.0;
-    }
-    return 0.0;
-  }
-
-  double _parseQuantity(dynamic val) {
-    if (val == null) return 1.0;
-    if (val is num) return val.toDouble();
-    if (val is String) {
-      final cleaned = val
-          .replaceAll(',', '.')
-          .replaceAll(RegExp(r'[^0-9.]'), '');
-      return double.tryParse(cleaned) ?? 1.0;
-    }
-    return 1.0;
-  }
-
-  List<TransactionItemInput> _extractReceiptItems(List items) {
-    final parsedItems = <TransactionItemInput>[];
-
-    for (final rawItem in items) {
-      if (rawItem is! Map) continue;
-
-      final name = (rawItem['name'] ?? rawItem['nama'] ?? rawItem['item'] ?? '')
-          .toString()
-          .trim();
-      final totalPrice = _parseAmount(
-        rawItem['total_price'] ?? rawItem['price'] ?? rawItem['harga'],
-      );
-
-      if (name.isEmpty || totalPrice <= 0) continue;
-
-      final quantity = _parseQuantity(
-        rawItem['quantity'] ?? rawItem['qty'] ?? rawItem['jumlah'],
-      );
-      final unitPrice = _parseAmount(
-        rawItem['unit_price'] ??
-            rawItem['price_per_item'] ??
-            rawItem['harga_satuan'],
-      );
-
-      parsedItems.add((
-        name: name,
-        quantity: quantity <= 0 ? 1.0 : quantity,
-        unitPrice: unitPrice > 0 ? unitPrice : null,
-        totalPrice: totalPrice,
-      ));
-    }
-
-    return parsedItems;
+    return ReceiptReviewUtils.validateScanResult(result);
   }
 
   Future<TransactionItemInput?> _showReceiptItemDialog(
@@ -242,6 +176,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final nameController = TextEditingController(text: initialItem?.name ?? '');
     final quantityController = TextEditingController(
       text: initialItem == null ? '1' : initialItem.quantity.toString(),
+    );
+    final unitPriceController = TextEditingController(
+      text: initialItem?.unitPrice == null
+          ? ''
+          : initialItem!.unitPrice!.toInt().toString(),
     );
     final totalController = TextEditingController(
       text: initialItem == null
@@ -267,6 +206,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                 decoration: const InputDecoration(labelText: 'Jumlah'),
               ),
               TextField(
+                controller: unitPriceController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Harga satuan'),
+              ),
+              TextField(
                 controller: totalController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Total harga'),
@@ -281,17 +225,26 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             TextButton(
               onPressed: () {
                 final name = nameController.text.trim();
-                final quantity = _parseQuantity(quantityController.text);
-                final totalPrice = _parseAmount(totalController.text);
+                final quantity = ReceiptReviewUtils.parseQuantity(
+                  quantityController.text,
+                );
+                final unitPrice = ReceiptReviewUtils.parseAmount(
+                  unitPriceController.text,
+                );
+                final totalPrice = ReceiptReviewUtils.parseAmount(
+                  totalController.text,
+                );
 
-                if (name.isEmpty || totalPrice <= 0) return;
-
-                Navigator.pop(context, (
+                final item = ReceiptReviewUtils.normalizeItem(
                   name: name,
-                  quantity: quantity <= 0 ? 1.0 : quantity,
-                  unitPrice: null,
+                  quantity: quantity,
+                  unitPrice: unitPrice,
                   totalPrice: totalPrice,
-                ));
+                );
+
+                if (item.name.isEmpty || item.totalPrice <= 0) return;
+
+                Navigator.pop(context, item);
               },
               child: const Text('Simpan'),
             ),
@@ -302,56 +255,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     nameController.dispose();
     quantityController.dispose();
+    unitPriceController.dispose();
     totalController.dispose();
     return result;
-  }
-
-  double _extractTotalAmount(Map<String, dynamic> result) {
-    final items = (result['items'] as List?) ?? [];
-
-    final rawTotal =
-        result['total'] ??
-        result['total_amount'] ??
-        result['grand_total'] ??
-        result['jumlah_total'] ??
-        result['total_harga'] ??
-        result['total_belanja'] ??
-        result['amount'];
-
-    var extractedTotal = _parseAmount(rawTotal);
-
-    if (extractedTotal == 0.0 && items.isNotEmpty) {
-      for (final item in items) {
-        if (item is Map) {
-          final itemPrice = _parseAmount(
-            item['total_price'] ?? item['price'] ?? item['harga'],
-          );
-          extractedTotal += itemPrice;
-        }
-      }
-    }
-
-    return extractedTotal;
   }
 
   void _showConfirmationBottomSheet() {
     if (_scanResult == null) return;
     final colors = AppColorScheme.of(context);
-
-    final storeName =
-        (_scanResult!['store_name'] as String?) ??
-        (_scanResult!['merchant'] as String?) ??
-        (_scanResult!['toko'] as String?) ??
-        'Struk Belanja';
-
-    final items = (_scanResult!['items'] as List?) ?? [];
-    final receiptItems = _extractReceiptItems(items);
-
-    final extractedTotal = _extractTotalAmount(_scanResult!);
-
-    final category =
-        (_scanResult!['category_suggestion'] as String?) ?? 'Belanja Harian';
-    final dateStr = (_scanResult!['date'] as String?) ?? '';
+    final review = ReceiptReviewUtils.fromScanResult(_scanResult!);
+    final storeName = review.merchant;
+    final receiptItems = [...review.items];
+    final extractedTotal = review.total;
+    final category = review.category;
+    final dateStr = review.dateText;
 
     showModalBottomSheet(
       context: context,
@@ -363,6 +280,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       builder: (modalContext) {
         return StatefulBuilder(
           builder: (modalContext, setModalState) {
+            final itemTotal = ReceiptReviewUtils.totalItems(receiptItems);
+            final difference = ReceiptReviewUtils.totalDifference(
+              extractedTotal,
+              receiptItems,
+            );
+            final hasMismatch = ReceiptReviewUtils.hasTotalMismatch(
+              extractedTotal,
+              receiptItems,
+            );
+
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
@@ -430,6 +357,24 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
+                              'Tanggal',
+                              style: AppTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              dateStr.isEmpty ? 'Hari ini' : dateStr,
+                              style: AppTypography.labelLarge.copyWith(
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Divider(color: colors.glassBorder),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
                               'Total Belanja',
                               style: AppTypography.caption.copyWith(
                                 color: colors.textSecondary,
@@ -472,114 +417,87 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Items breakdown if available
-                  if (receiptItems.isNotEmpty) ...[
-                    Row(
+                  GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
+                        const Icon(
+                          Icons.shopping_bag_rounded,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            'Rincian Item (${receiptItems.length}):',
-                            style: AppTypography.labelMedium.copyWith(
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () async {
-                            final item = await _showReceiptItemDialog(
-                              modalContext,
-                            );
-                            if (item != null) {
-                              setModalState(() => receiptItems.add(item));
-                            }
-                          },
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text('Item'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 150),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: receiptItems.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
-                        itemBuilder: (context, index) {
-                          final item = receiptItems[index];
-
-                          return Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  '${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} x ${item.name}',
-                                  style: AppTypography.bodySmall.copyWith(
-                                    color: colors.textSecondary,
-                                  ),
-                                ),
-                              ),
                               Text(
-                                CurrencyFormatter.formatRupiah(item.totalPrice),
-                                style: AppTypography.caption.copyWith(
+                                '${receiptItems.length} item terdeteksi',
+                                style: AppTypography.labelLarge.copyWith(
                                   color: colors.textPrimary,
                                 ),
                               ),
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                icon: Icon(
-                                  Icons.edit_rounded,
-                                  size: 18,
-                                  color: colors.textSecondary,
+                              if (receiptItems.isNotEmpty)
+                                Text(
+                                  'Total item ${CurrencyFormatter.formatRupiah(itemTotal)}',
+                                  style: AppTypography.caption.copyWith(
+                                    color: colors.textSecondary,
+                                  ),
                                 ),
-                                onPressed: () async {
-                                  final edited = await _showReceiptItemDialog(
-                                    modalContext,
-                                    initialItem: item,
-                                  );
-                                  if (edited != null) {
-                                    setModalState(
-                                      () => receiptItems[index] = edited,
-                                    );
-                                  }
-                                },
-                              ),
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  size: 18,
-                                  color: AppColors.expense,
-                                ),
-                                onPressed: () {
-                                  setModalState(
-                                    () => receiptItems.removeAt(index),
-                                  );
-                                },
-                              ),
                             ],
-                          );
-                        },
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await _showReceiptItemsEditor(
+                              modalContext,
+                              receiptItems,
+                            );
+                            setModalState(() {});
+                          },
+                          child: Text(
+                            receiptItems.isEmpty
+                                ? 'Tambah Item'
+                                : 'Lihat/Edit Item',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (hasMismatch) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.warning,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Total item berbeda dengan total transaksi. Selisih ${CurrencyFormatter.formatRupiah(difference.abs())}.',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                  ] else ...[
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () async {
-                          final item = await _showReceiptItemDialog(
-                            modalContext,
-                          );
-                          if (item != null) {
-                            setModalState(() => receiptItems.add(item));
-                          }
-                        },
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Tambah item struk'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                   ],
+                  const SizedBox(height: 16),
 
                   // Action Buttons Row (Scan Ulang & Simpan Transaksi)
                   Row(
@@ -645,6 +563,167 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showReceiptItemsEditor(
+    BuildContext context,
+    List<TransactionItemInput> receiptItems,
+  ) {
+    final colors = AppColorScheme.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.backgroundSecondary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Edit Item Struk',
+                            style: AppTypography.headingSmall.copyWith(
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.55,
+                      ),
+                      child: receiptItems.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  'Belum ada item.',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: receiptItems.length,
+                              separatorBuilder: (_, __) =>
+                                  Divider(color: colors.glassBorder),
+                              itemBuilder: (context, index) {
+                                final item = receiptItems[index];
+                                final unitText = item.unitPrice == null
+                                    ? null
+                                    : CurrencyFormatter.formatRupiah(
+                                        item.unitPrice!,
+                                      );
+
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    item.name,
+                                    style: AppTypography.labelMedium.copyWith(
+                                      color: colors.textPrimary,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    unitText == null
+                                        ? '${_formatQuantity(item.quantity)} item'
+                                        : '${_formatQuantity(item.quantity)} x $unitText',
+                                    style: AppTypography.caption.copyWith(
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        CurrencyFormatter.formatRupiah(
+                                          item.totalPrice,
+                                        ),
+                                        style: AppTypography.caption.copyWith(
+                                          color: colors.textPrimary,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () async {
+                                          final edited =
+                                              await _showReceiptItemDialog(
+                                                context,
+                                                initialItem: item,
+                                              );
+                                          if (edited != null) {
+                                            setSheetState(
+                                              () =>
+                                                  receiptItems[index] = edited,
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(
+                                          Icons.edit_rounded,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          setSheetState(
+                                            () => receiptItems.removeAt(index),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: AppColors.expense,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    GlassButton(
+                      label: 'Tambah Item',
+                      icon: Icons.add_rounded,
+                      variant: GlassButtonVariant.secondary,
+                      height: 46,
+                      onPressed: () async {
+                        final item = await _showReceiptItemDialog(context);
+                        if (item != null) {
+                          setSheetState(() => receiptItems.add(item));
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatQuantity(double quantity) {
+    return quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 1);
   }
 
   @override
