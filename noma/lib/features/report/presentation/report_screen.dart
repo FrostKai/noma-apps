@@ -18,7 +18,7 @@ class ReportScreen extends ConsumerStatefulWidget {
 
 class _ReportScreenState extends ConsumerState<ReportScreen> {
   int _touchedPieIndex = -1;
-  String _selectedPeriod = 'this_month'; // 'this_month', 'last_month', 'all'
+  String _selectedPeriod = 'this_month';
 
   @override
   Widget build(BuildContext context) {
@@ -60,80 +60,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                 _buildPeriodFilterSelector(context),
                 const SizedBox(height: 20),
 
-                // Overview Cards (Income vs Expense)
-                Row(
-                  children: [
-                    Expanded(
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        borderColor: AppColors.income.withValues(alpha: 0.4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.arrow_downward_rounded,
-                                  color: AppColors.income,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Pemasukan',
-                                  style: AppTypography.caption.copyWith(
-                                    color: colors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              CurrencyFormatter.formatRupiahCompact(income),
-                              style: AppTypography.headingMedium.copyWith(
-                                color: AppColors.income,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        borderColor: AppColors.expense.withValues(alpha: 0.4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: AppColors.expense,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Pengeluaran',
-                                  style: AppTypography.caption.copyWith(
-                                    color: colors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              CurrencyFormatter.formatRupiahCompact(expense),
-                              style: AppTypography.headingMedium.copyWith(
-                                color: AppColors.expense,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                _buildReportSummaryGrid(context, report.summary),
                 const SizedBox(height: 24),
 
                 // Bar Chart Comparison Section
@@ -306,6 +233,30 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         endMs: end.millisecondsSinceEpoch,
       );
     }
+    if (_selectedPeriod == 'three_months') {
+      final start = DateTime(now.year, now.month - 2);
+      final end = DateTime(now.year, now.month + 1);
+      return (
+        startMs: start.millisecondsSinceEpoch,
+        endMs: end.millisecondsSinceEpoch,
+      );
+    }
+    if (_selectedPeriod == 'six_months') {
+      final start = DateTime(now.year, now.month - 5);
+      final end = DateTime(now.year, now.month + 1);
+      return (
+        startMs: start.millisecondsSinceEpoch,
+        endMs: end.millisecondsSinceEpoch,
+      );
+    }
+    if (_selectedPeriod == 'this_year') {
+      final start = DateTime(now.year);
+      final end = DateTime(now.year + 1);
+      return (
+        startMs: start.millisecondsSinceEpoch,
+        endMs: end.millisecondsSinceEpoch,
+      );
+    }
     return (startMs: null, endMs: null);
   }
 
@@ -314,55 +265,148 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     final periods = [
       {'key': 'this_month', 'label': 'Bulan Ini'},
       {'key': 'last_month', 'label': 'Bulan Lalu'},
+      {'key': 'three_months', 'label': '3 Bulan'},
+      {'key': 'six_months', 'label': '6 Bulan'},
+      {'key': 'this_year', 'label': 'Tahun Ini'},
       {'key': 'all', 'label': 'Semua Waktu'},
     ];
 
-    return Row(
-      children: periods.map((p) {
-        final isSelected = _selectedPeriod == p['key'];
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: periods.map((p) {
+          final isSelected = _selectedPeriod == p['key'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedPeriod = p['key']!;
-                });
-              },
+              onTap: () => setState(() => _selectedPeriod = p['key']!),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.primary : colors.glassSurface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected ? AppColors.primary : colors.glassBorder,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                          ),
-                        ]
-                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    p['label']!,
-                    style: AppTypography.caption.copyWith(
-                      color: isSelected ? Colors.white : colors.textSecondary,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
+                child: Text(
+                  p['label']!,
+                  style: AppTypography.caption.copyWith(
+                    color: isSelected ? Colors.white : colors.textSecondary,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               ),
             ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildReportSummaryGrid(
+    BuildContext context,
+    TransactionSummary summary,
+  ) {
+    final net = summary.balance;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildSummaryCard(
+                context,
+                'Pemasukan',
+                CurrencyFormatter.formatRupiahCompact(summary.income),
+                Icons.arrow_downward_rounded,
+                AppColors.income,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSummaryCard(
+                context,
+                'Pengeluaran',
+                CurrencyFormatter.formatRupiahCompact(summary.expense),
+                Icons.arrow_upward_rounded,
+                AppColors.expense,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSummaryCard(
+                context,
+                'Selisih',
+                CurrencyFormatter.formatRupiahCompact(net),
+                net >= 0
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                net >= 0 ? AppColors.income : AppColors.expense,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSummaryCard(
+                context,
+                'Transaksi',
+                '${summary.count}',
+                Icons.receipt_long_rounded,
+                AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    final colors = AppColorScheme.of(context);
+
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      borderColor: color.withValues(alpha: 0.4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      }).toList(),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: AppTypography.headingMedium.copyWith(color: color),
+          ),
+        ],
+      ),
     );
   }
 

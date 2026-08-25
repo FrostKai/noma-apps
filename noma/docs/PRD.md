@@ -12,6 +12,8 @@ Status teknis terakhir:
 - Target 100.000 transaksi sudah diuji lewat query smoke tanpa memuat seluruh histori ke memory.
 - Histori transaksi sudah memakai pemilih bulan, filter range `transaction_date >= startMonth AND transaction_date < nextMonth`, dan pagination `LIMIT/OFFSET` per halaman.
 - UI histori sudah dipindah ke `CustomScrollView` + `SliverList.builder`, sehingga transaction card dibangun secara lazy.
+- Dashboard sudah disederhanakan menjadi snapshot cepat: saldo bersih, periode aktif, ringkasan bulan ini, dan 5 transaksi terbaru.
+- Analisis kategori, merchant, item struk, dan statistik detail dipusatkan di halaman Laporan.
 
 ## 1. Ringkasan Produk
 
@@ -45,25 +47,36 @@ Target pengguna Noma:
 Dashboard menampilkan:
 
 - Total saldo bersih.
-- Total pemasukan.
-- Total pengeluaran.
-- Grafik pemasukan dan pengeluaran.
-- Tren 7 hari terakhir.
+- Periode saat ini.
 - Ringkasan bulan ini.
-- Riwayat transaksi.
-- Navigasi bulan histori transaksi.
-- Search transaksi.
-- Filter transaksi berdasarkan semua, pemasukan, atau pengeluaran.
-- Tombol `Muat Lagi` untuk pagination histori.
+- Pemasukan bulan ini.
+- Pengeluaran bulan ini.
+- 5 transaksi terbaru.
+- Tombol `Lihat semua` menuju halaman Transaksi penuh.
 
 Catatan performa:
 
-- Dashboard tidak memuat seluruh histori transaksi.
+- Dashboard tidak memuat seluruh histori transaksi, `transaction_items`, atau gambar struk.
+- Transaksi terbaru memakai query `ORDER BY transaction_date DESC, id DESC LIMIT 5`.
+- Dashboard tidak menampilkan grafik, breakdown kategori, top merchant, atau top receipt item; analisis tersebut berada di halaman Laporan.
+
+### 4.1.1 Halaman Transaksi
+
+Halaman Transaksi adalah tempat melihat histori transaksi lengkap.
+
+Fitur:
+
+- Navigasi bulan histori transaksi.
+- Search transaksi dengan debounce 300ms.
+- Filter transaksi berdasarkan semua, pemasukan, atau pengeluaran.
+- Tombol `Muat Lagi` untuk pagination histori.
+- List virtualized menggunakan `CustomScrollView` + `SliverList.builder`.
+
+Catatan performa:
+
 - Riwayat transaksi aktif dibatasi per bulan dengan date range.
 - Tombol `Muat Lagi` mengambil halaman berikutnya dengan `LIMIT 50 OFFSET n`, bukan menaikkan limit lama.
-- List histori memakai `SliverList.builder` agar rendering item dilakukan secara lazy.
-- Chart 7 hari memakai agregasi SQLite, bukan 10 transaksi terbaru.
-- Search memakai debounce 300ms.
+- Histori tidak memuat `transaction_items` atau gambar struk untuk setiap card.
 
 ### 4.2 Pencatatan Manual
 
@@ -130,6 +143,8 @@ Halaman laporan menampilkan:
 
 - Total pemasukan berdasarkan periode.
 - Total pengeluaran berdasarkan periode.
+- Selisih atau net cash flow berdasarkan periode.
+- Jumlah transaksi berdasarkan periode.
 - Grafik pemasukan vs pengeluaran.
 - Pengeluaran berdasarkan kategori.
 - Barang yang paling banyak menghabiskan uang.
@@ -139,6 +154,9 @@ Periode laporan:
 
 - Bulan ini.
 - Bulan lalu.
+- 3 bulan terakhir.
+- 6 bulan terakhir.
+- Tahun ini.
 - Semua waktu.
 
 Catatan performa:
@@ -252,7 +270,7 @@ Optimasi yang sudah diterapkan:
 - Query berdasarkan periode.
 - Aggregate query untuk summary.
 - Aggregate query untuk laporan.
-- Aggregate query untuk chart 7 hari.
+- Query terbatas `LIMIT 5` untuk transaksi terbaru Dashboard.
 - Search debounce.
 - Detail item struk tidak dimuat massal di dashboard.
 - Chatbot memakai konteks terbatas.
@@ -270,6 +288,7 @@ Target performa:
 - Dashboard harus memakai query terbatas dan agregasi database.
 - Laporan harus memakai agregasi database.
 - Histori transaksi harus memakai pagination.
+- Dashboard hanya boleh menjadi snapshot cepat, bukan halaman analisis lengkap.
 - Search tidak boleh query terlalu agresif pada setiap karakter.
 
 ### 7.2 Offline
@@ -353,6 +372,7 @@ Metrik MVP:
 - Pengguna dapat menyimpan hasil scan struk setelah koreksi.
 - Dashboard tetap responsif pada histori besar.
 - Laporan tetap memakai agregasi database.
+- Halaman Transaksi tetap bisa membuka histori bulan-bulan lama tanpa menghapus data.
 - Tidak ada error analyzer atau test pada build utama.
 
 ## 12. Glosarium

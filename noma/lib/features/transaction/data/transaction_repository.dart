@@ -90,6 +90,8 @@ abstract class ITransactionRepository {
     int limit,
     int offset,
   });
+  Stream<List<Transaction>> watchLatestTransactions({int limit});
+  Future<List<Transaction>> getLatestTransactions({int limit});
   Stream<TransactionSummary> watchSummary({int? startMs, int? endMs});
   Stream<ReportData> watchReportData({int? startMs, int? endMs});
   Stream<List<DailyTransactionTotal>> watchDailyTotals({
@@ -173,6 +175,36 @@ class TransactionRepository implements ITransactionRepository {
         (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
       ])
       ..limit(limit, offset: offset);
+
+    return query.get();
+  }
+
+  @override
+  Stream<List<Transaction>> watchLatestTransactions({int limit = 5}) {
+    final query = _db.select(_db.transactions)
+      ..orderBy([
+        (t) => OrderingTerm(
+          expression: t.transactionDate,
+          mode: OrderingMode.desc,
+        ),
+        (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+      ])
+      ..limit(limit);
+
+    return query.watch();
+  }
+
+  @override
+  Future<List<Transaction>> getLatestTransactions({int limit = 5}) {
+    final query = _db.select(_db.transactions)
+      ..orderBy([
+        (t) => OrderingTerm(
+          expression: t.transactionDate,
+          mode: OrderingMode.desc,
+        ),
+        (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+      ])
+      ..limit(limit);
 
     return query.get();
   }

@@ -3,6 +3,7 @@ class AppRoutes {
 
   static const String splash = '/';
   static const String home = '/home';
+  static const String transactions = '/transactions';
   static const String addTransaction = '/add-transaction';
   static const String scanner = '/scanner';
   static const String chatbot = '/chatbot';

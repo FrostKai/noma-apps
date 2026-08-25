@@ -19,7 +19,13 @@ void main(List<String> args) {
       final monthEnd = DateTime(2026, 9).millisecondsSinceEpoch;
 
       final results = <String, int>{};
-      results['dashboard_page'] = _time(() {
+      results['latest_transactions'] = _time(() {
+        db.select(
+          'SELECT * FROM transactions '
+          'ORDER BY transaction_date DESC, id DESC LIMIT 5',
+        );
+      });
+      results['legacy_dashboard_page_reference'] = _time(() {
         db.select(
           'SELECT * FROM transactions '
           'ORDER BY transaction_date DESC, id DESC LIMIT 50',
@@ -117,6 +123,14 @@ int _time(void Function() fn) {
 }
 
 void _printExplain(Database db, int monthStart, int monthEnd) {
+  final latestRows = db.select(
+    'EXPLAIN QUERY PLAN SELECT * FROM transactions '
+    'ORDER BY transaction_date DESC, id DESC LIMIT 5',
+  );
+  for (final row in latestRows) {
+    print('latest_transactions_explain=${row.values.join(' | ')}');
+  }
+
   final rows = db.select(
     'EXPLAIN QUERY PLAN SELECT * FROM transactions '
     'WHERE transaction_date >= ? AND transaction_date < ? '

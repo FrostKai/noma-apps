@@ -31,6 +31,12 @@ final transactionsPageStreamProvider = StreamProvider.autoDispose
       );
     });
 
+final latestTransactionsStreamProvider = StreamProvider.autoDispose
+    .family<List<Transaction>, int>((ref, limit) {
+      final repo = ref.watch(transactionRepositoryProvider);
+      return repo.watchLatestTransactions(limit: limit);
+    });
+
 typedef TransactionHistoryArgs = ({
   String type,
   String searchQuery,

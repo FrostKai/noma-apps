@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import '../constants/app_routes.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/transaction/presentation/add_transaction_screen.dart';
+import '../../features/transaction/presentation/transaction_history_screen.dart';
 import '../../features/receipt_scanner/presentation/scanner_screen.dart';
 import '../../features/chatbot/presentation/chatbot_screen.dart';
 import '../../features/report/presentation/report_screen.dart';
@@ -20,6 +21,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.home,
       builder: (context, state) => const MainShellScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.transactions,
+      builder: (context, state) => const TransactionHistoryScreen(),
     ),
     GoRoute(
       path: AppRoutes.addTransaction,

@@ -229,6 +229,80 @@ void main() {
 
     expect(rows, hasLength(50));
   });
+
+  test('latest transactions are limited and sorted by date then id', () async {
+    final older = await _insertTx(
+      db,
+      date: DateTime(2026, 8, 23),
+      category: 'Older',
+    );
+    final firstSameDate = await _insertTx(
+      db,
+      date: DateTime(2026, 8, 25),
+      category: 'Same Date First',
+    );
+    final secondSameDate = await _insertTx(
+      db,
+      date: DateTime(2026, 8, 25),
+      category: 'Same Date Second',
+    );
+    for (var i = 0; i < 10; i++) {
+      await _insertTx(
+        db,
+        date: DateTime(2026, 8, 24).subtract(Duration(minutes: i)),
+        category: 'Middle $i',
+      );
+    }
+
+    final rows = await repo.getLatestTransactions(limit: 5);
+
+    expect(rows, hasLength(5));
+    expect(rows[0].id, secondSameDate);
+    expect(rows[1].id, firstSameDate);
+    expect(rows.map((tx) => tx.id), isNot(contains(older)));
+  });
+
+  test('latest transactions query stays bounded on a large dataset', () async {
+    await _insertManyTx(db, count: 10000);
+
+    final rows = await repo.getLatestTransactions(limit: 5);
+
+    expect(rows, hasLength(5));
+  });
+
+  test('report summary aggregates the selected period only', () async {
+    await _insertTx(
+      db,
+      type: 'income',
+      date: DateTime(2026, 8, 25),
+      category: 'Gaji',
+    );
+    await _insertTx(
+      db,
+      type: 'expense',
+      date: DateTime(2026, 8, 24),
+      category: 'Makanan',
+    );
+    await _insertTx(
+      db,
+      type: 'expense',
+      date: DateTime(2026, 7, 24),
+      category: 'Transportasi',
+    );
+
+    final report = await repo
+        .watchReportData(
+          startMs: DateTime(2026, 8).millisecondsSinceEpoch,
+          endMs: DateTime(2026, 9).millisecondsSinceEpoch,
+        )
+        .first
+        .timeout(const Duration(seconds: 2));
+
+    expect(report.summary.count, 2);
+    expect(report.summary.income, 5000000);
+    expect(report.summary.expense, 25000);
+    expect(report.summary.balance, 4975000);
+  });
 }
 
 Future<int> _insertTx(
