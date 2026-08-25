@@ -615,3 +615,34 @@ No issues found.
 flutter test
 All tests passed.
 ```
+
+## Follow-up Implementation: Transaction List UI Rendering
+
+Tanggal implementasi: 2026-08-25
+
+Perubahan yang sudah dilakukan:
+- Histori tetap memakai `CustomScrollView` + `SliverList.builder`.
+- Watch provider histori dipindahkan ke sliver khusus, sehingga `load more`, error footer, dan state list tidak perlu rebuild seluruh dashboard/header.
+- `TransactionCard` tetap presentational dan tidak melakukan query database.
+- `transaction_items` tidak diload untuk card histori.
+- `receipt_image_path` tidak dipakai untuk decode/load gambar di list histori.
+- Efek glass pada `TransactionCard` dibuat lebih ringan dengan mematikan `BackdropFilter` per item.
+- `GlassCard` tetap default memakai blur untuk dashboard/modal/section lain, tetapi sekarang memiliki opsi `enableBlur: false` untuk list item performa tinggi.
+- Shadow item transaksi diringankan agar tidak menghilangkan identitas visual Noma tetapi mengurangi biaya paint.
+
+Bottleneck sebelum:
+- Card transaksi memakai `BackdropFilter + ImageFilter.blur` lewat `GlassCard` pada setiap item.
+- State histori di-watch langsung oleh `HomeScreen`, sehingga perubahan pagination bisa memicu rebuild area dashboard.
+
+Bottleneck setelah:
+- List masih bergantung pada jumlah item yang sudah dimuat untuk ukuran state Dart, tetapi rendering viewport tetap lazy via sliver.
+- Search masih memakai `%LIKE%`; ini sengaja tidak diubah pada phase UI rendering.
+- Frame/raster time Android belum diukur karena belum ada integration/perf test scroll otomatis.
+
+Performance smoke query setelah phase ini:
+
+| Rows | Monthly Page 1 | Monthly Page 2 | Month+Type+Search | EXPLAIN |
+| ---: | ---: | ---: | ---: | --- |
+| 1,000 | 458us | 171us | 226us | uses `idx_transactions_date_id` |
+| 10,000 | 332us | 287us | 748us | uses `idx_transactions_date_id` |
+| 50,000 | 306us | 376us | 606us | uses `idx_transactions_date_id` |

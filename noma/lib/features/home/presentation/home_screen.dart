@@ -74,9 +74,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       endMs: historyNextMonthStart.millisecondsSinceEpoch,
       pageSize: defaultTransactionPageSize,
     );
-    final historyState = ref.watch(
-      transactionHistoryControllerProvider(historyArgs),
-    );
     final monthlySummaryAsync = ref.watch(
       transactionSummaryStreamProvider((
         startMs: monthStart.millisecondsSinceEpoch,
@@ -205,11 +202,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              _buildRecentTransactionsSliver(
-                context,
-                ref,
-                historyArgs,
-                historyState,
+              _TransactionHistorySliver(
+                historyArgs: historyArgs,
+                searchQuery: _searchQuery,
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
@@ -701,13 +696,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _selectedMonth = next;
     });
   }
+}
 
-  Widget _buildRecentTransactionsSliver(
-    BuildContext context,
-    WidgetRef ref,
-    TransactionHistoryArgs historyArgs,
-    TransactionHistoryState historyState,
-  ) {
+class _TransactionHistorySliver extends ConsumerWidget {
+  final TransactionHistoryArgs historyArgs;
+  final String searchQuery;
+
+  const _TransactionHistorySliver({
+    required this.historyArgs,
+    required this.searchQuery,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyState = ref.watch(
+      transactionHistoryControllerProvider(historyArgs),
+    );
+
     if (historyState.isInitialLoading) {
       return const SliverToBoxAdapter(
         child: Padding(
@@ -777,7 +782,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    _searchQuery.isNotEmpty
+                    searchQuery.isNotEmpty
                         ? 'Transaksi tidak ditemukan'
                         : 'Belum ada transaksi di bulan ini',
                     style: AppTypography.headingSmall.copyWith(
@@ -786,13 +791,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _searchQuery.isNotEmpty
+                    searchQuery.isNotEmpty
                         ? 'Coba gunakan kata kunci pencarian yang lain.'
                         : 'Mulai dengan tambah manual atau scan struk pertama kamu.',
                     textAlign: TextAlign.center,
                     style: AppTypography.caption,
                   ),
-                  if (_searchQuery.isEmpty) ...[
+                  if (searchQuery.isEmpty) ...[
                     const SizedBox(height: 18),
                     Row(
                       children: [

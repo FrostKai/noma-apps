@@ -44,20 +44,33 @@ class TransactionCard extends StatelessWidget {
       case 'investasi':
         return Icons.trending_up_rounded;
       default:
-        return isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+        return isIncome
+            ? Icons.arrow_downward_rounded
+            : Icons.arrow_upward_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColorScheme.of(context);
-    final date = DateTime.fromMillisecondsSinceEpoch(transaction.transactionDate);
+    final isLight = AppColorScheme.isLight(context);
+    final date = DateTime.fromMillisecondsSinceEpoch(
+      transaction.transactionDate,
+    );
     final accentColor = isIncome ? AppColors.income : AppColors.expense;
 
     return GlassCard(
       onTap: onTap,
+      enableBlur: false,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       margin: const EdgeInsets.only(bottom: 10),
+      shadows: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ],
       child: Row(
         children: [
           // Icon Container
@@ -67,9 +80,7 @@ class TransactionCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: accentColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: accentColor.withValues(alpha: 0.3),
-              ),
+              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
             ),
             child: Icon(_icon, color: accentColor, size: 22),
           ),
@@ -85,14 +96,20 @@ class TransactionCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         transaction.category,
-                        style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
+                        style: AppTypography.labelLarge.copyWith(
+                          color: colors.textPrimary,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (transaction.paymentMethod != null && transaction.paymentMethod!.isNotEmpty)
+                    if (transaction.paymentMethod != null &&
+                        transaction.paymentMethod!.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         margin: const EdgeInsets.only(left: 6),
                         decoration: BoxDecoration(
                           color: colors.glassSurface,
@@ -101,7 +118,10 @@ class TransactionCard extends StatelessWidget {
                         ),
                         child: Text(
                           transaction.paymentMethod!,
-                          style: AppTypography.caption.copyWith(fontSize: 10, color: colors.textSecondary),
+                          style: AppTypography.caption.copyWith(
+                            fontSize: 10,
+                            color: colors.textSecondary,
+                          ),
                         ),
                       ),
                   ],
@@ -111,14 +131,24 @@ class TransactionCard extends StatelessWidget {
                   children: [
                     Text(
                       DateFormatter.formatRelative(date),
-                      style: AppTypography.caption.copyWith(color: colors.textMuted),
+                      style: AppTypography.caption.copyWith(
+                        color: colors.textMuted,
+                      ),
                     ),
-                    if (transaction.description != null && transaction.description!.isNotEmpty) ...[
-                      Text(' • ', style: AppTypography.caption.copyWith(color: colors.textMuted)),
+                    if (transaction.description != null &&
+                        transaction.description!.isNotEmpty) ...[
+                      Text(
+                        ' • ',
+                        style: AppTypography.caption.copyWith(
+                          color: colors.textMuted,
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           transaction.description!,
-                          style: AppTypography.caption.copyWith(color: colors.textMuted),
+                          style: AppTypography.caption.copyWith(
+                            color: colors.textMuted,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

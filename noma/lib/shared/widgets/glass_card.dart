@@ -16,6 +16,7 @@ class GlassCard extends StatelessWidget {
   final List<BoxShadow>? shadows;
   final double? width;
   final double? height;
+  final bool enableBlur;
 
   const GlassCard({
     super.key,
@@ -29,6 +30,7 @@ class GlassCard extends StatelessWidget {
     this.shadows,
     this.width,
     this.height,
+    this.enableBlur = true,
   });
 
   @override
@@ -54,13 +56,15 @@ class GlassCard extends StatelessWidget {
 
     Widget frosted = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: GlassTheme.blurSigmaX,
-          sigmaY: GlassTheme.blurSigmaY,
-        ),
-        child: content,
-      ),
+      child: enableBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: GlassTheme.blurSigmaX,
+                sigmaY: GlassTheme.blurSigmaY,
+              ),
+              child: content,
+            )
+          : content,
     );
 
     if (margin != null) {
