@@ -547,3 +547,71 @@ No issues found.
 flutter test
 All tests passed.
 ```
+
+## Follow-up Implementation: Monthly Virtualized History
+
+Tanggal implementasi: 2026-08-25
+
+Perubahan yang sudah dilakukan setelah audit:
+- Histori transaksi di dashboard sekarang memakai bulan aktif sebagai state UI.
+- Query histori memakai date range: `transaction_date >= startMonth AND transaction_date < nextMonth`.
+- Filter bulan, tipe transaksi, dan search dikombinasikan di database.
+- Pagination histori memakai page-based `LIMIT 50 OFFSET n`.
+- Perubahan bulan/filter/search membuat provider family baru, sehingga data bulan lama tidak tercampur dengan bulan baru.
+- UI histori memakai `CustomScrollView` + `SliverList.builder`.
+- Header tanggal seperti `25 AGUSTUS` dibuat sebagai row ringan di list, bukan dengan query item struk.
+- `transaction_items` tetap tidak diload untuk transaction card.
+- Schema database dan index tidak berubah.
+
+Query histori utama:
+
+```sql
+SELECT *
+FROM transactions
+WHERE transaction_date >= ?
+  AND transaction_date < ?
+ORDER BY transaction_date DESC, id DESC
+LIMIT 50 OFFSET ?
+```
+
+Query histori dengan filter tipe dan search:
+
+```sql
+SELECT *
+FROM transactions
+WHERE type = ?
+  AND transaction_date >= ?
+  AND transaction_date < ?
+  AND (
+    category LIKE ?
+    OR description LIKE ?
+    OR payment_method LIKE ?
+  )
+ORDER BY transaction_date DESC, id DESC
+LIMIT 50 OFFSET ?
+```
+
+EXPLAIN query plan untuk histori bulanan:
+
+```text
+SEARCH transactions USING INDEX idx_transactions_date_id (transaction_date>? AND transaction_date<?)
+```
+
+Benchmark terbaru dari `dart run tool/perf_smoke.dart 1000 10000 50000 100000`:
+
+| Rows | Monthly Page 1 | Monthly Page 2 | Month+Type+Search | EXPLAIN |
+| ---: | ---: | ---: | ---: | --- |
+| 1,000 | 713us | 208us | 271us | uses `idx_transactions_date_id` |
+| 10,000 | 279us | 275us | 353us | uses `idx_transactions_date_id` |
+| 50,000 | 269us | 333us | 422us | uses `idx_transactions_date_id` |
+| 100,000 | 371us | 353us | 467us | uses `idx_transactions_date_id` |
+
+Validation setelah implementasi:
+
+```text
+flutter analyze
+No issues found.
+
+flutter test
+All tests passed.
+```

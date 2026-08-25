@@ -12,6 +12,8 @@ final transactionRepositoryProvider = Provider<ITransactionRepository>((ref) {
 typedef TransactionPageArgs = ({
   String type,
   String searchQuery,
+  int? startMs,
+  int? endMs,
   int limit,
   int offset,
 });
@@ -22,10 +24,137 @@ final transactionsPageStreamProvider = StreamProvider.autoDispose
       return repo.watchTransactionsPage(
         type: args.type,
         searchQuery: args.searchQuery,
+        startMs: args.startMs,
+        endMs: args.endMs,
         limit: args.limit,
         offset: args.offset,
       );
     });
+
+typedef TransactionHistoryArgs = ({
+  String type,
+  String searchQuery,
+  int startMs,
+  int endMs,
+  int pageSize,
+});
+
+class TransactionHistoryState {
+  final List<Transaction> transactions;
+  final int nextOffset;
+  final bool isInitialLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final Object? error;
+
+  const TransactionHistoryState({
+    this.transactions = const [],
+    this.nextOffset = 0,
+    this.isInitialLoading = true,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.error,
+  });
+
+  TransactionHistoryState copyWith({
+    List<Transaction>? transactions,
+    int? nextOffset,
+    bool? isInitialLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
+    Object? error,
+    bool clearError = false,
+  }) {
+    return TransactionHistoryState(
+      transactions: transactions ?? this.transactions,
+      nextOffset: nextOffset ?? this.nextOffset,
+      isInitialLoading: isInitialLoading ?? this.isInitialLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      error: clearError ? null : error ?? this.error,
+    );
+  }
+}
+
+final transactionHistoryControllerProvider = StateNotifierProvider.autoDispose
+    .family<
+      TransactionHistoryController,
+      TransactionHistoryState,
+      TransactionHistoryArgs
+    >((ref, args) {
+      final repo = ref.watch(transactionRepositoryProvider);
+      return TransactionHistoryController(repo, args);
+    });
+
+class TransactionHistoryController
+    extends StateNotifier<TransactionHistoryState> {
+  final ITransactionRepository _repo;
+  final TransactionHistoryArgs _args;
+
+  TransactionHistoryController(this._repo, this._args)
+    : super(const TransactionHistoryState()) {
+    Future.microtask(loadInitial);
+  }
+
+  Future<void> loadInitial() async {
+    state = const TransactionHistoryState(isInitialLoading: true);
+    try {
+      final page = await _loadPage(offset: 0);
+      state = TransactionHistoryState(
+        transactions: page,
+        nextOffset: page.length,
+        isInitialLoading: false,
+        hasMore: page.length == _args.pageSize,
+      );
+    } catch (e) {
+      state = TransactionHistoryState(
+        isInitialLoading: false,
+        hasMore: false,
+        error: e,
+      );
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (state.isInitialLoading || state.isLoadingMore || !state.hasMore) {
+      return;
+    }
+
+    state = state.copyWith(isLoadingMore: true, clearError: true);
+    try {
+      final page = await _loadPage(offset: state.nextOffset);
+      state = state.copyWith(
+        transactions: [...state.transactions, ...page],
+        nextOffset: state.nextOffset + page.length,
+        isLoadingMore: false,
+        hasMore: page.length == _args.pageSize,
+        clearError: true,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: e);
+    }
+  }
+
+  void removeTransaction(int id) {
+    final updated = state.transactions.where((tx) => tx.id != id).toList();
+    state = state.copyWith(
+      transactions: updated,
+      nextOffset: updated.length,
+      clearError: true,
+    );
+  }
+
+  Future<List<Transaction>> _loadPage({required int offset}) {
+    return _repo.getTransactionsPage(
+      type: _args.type,
+      searchQuery: _args.searchQuery,
+      startMs: _args.startMs,
+      endMs: _args.endMs,
+      limit: _args.pageSize,
+      offset: offset,
+    );
+  }
+}
 
 typedef SummaryRangeArgs = ({int? startMs, int? endMs});
 

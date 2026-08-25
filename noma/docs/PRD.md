@@ -10,6 +10,8 @@ Status teknis terakhir:
 - `flutter test`: PASS.
 - Perf smoke SQLite in-memory tersedia di `tool/perf_smoke.dart`.
 - Target 100.000 transaksi sudah diuji lewat query smoke tanpa memuat seluruh histori ke memory.
+- Histori transaksi sudah memakai pemilih bulan, filter range `transaction_date >= startMonth AND transaction_date < nextMonth`, dan pagination `LIMIT/OFFSET` per halaman.
+- UI histori sudah dipindah ke `CustomScrollView` + `SliverList.builder`, sehingga transaction card dibangun secara lazy.
 
 ## 1. Ringkasan Produk
 
@@ -49,6 +51,7 @@ Dashboard menampilkan:
 - Tren 7 hari terakhir.
 - Ringkasan bulan ini.
 - Riwayat transaksi.
+- Navigasi bulan histori transaksi.
 - Search transaksi.
 - Filter transaksi berdasarkan semua, pemasukan, atau pengeluaran.
 - Tombol `Muat Lagi` untuk pagination histori.
@@ -56,8 +59,9 @@ Dashboard menampilkan:
 Catatan performa:
 
 - Dashboard tidak memuat seluruh histori transaksi.
-- Riwayat transaksi dibatasi dengan query `LIMIT`.
-- Tombol `Muat Lagi` menambah jumlah transaksi yang dimuat secara bertahap.
+- Riwayat transaksi aktif dibatasi per bulan dengan date range.
+- Tombol `Muat Lagi` mengambil halaman berikutnya dengan `LIMIT 50 OFFSET n`, bukan menaikkan limit lama.
+- List histori memakai `SliverList.builder` agar rendering item dilakukan secara lazy.
 - Chart 7 hari memakai agregasi SQLite, bukan 10 transaksi terbaru.
 - Search memakai debounce 300ms.
 

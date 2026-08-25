@@ -25,6 +25,31 @@ void main(List<String> args) {
           'ORDER BY transaction_date DESC, id DESC LIMIT 50',
         );
       });
+      results['monthly_history_page_1'] = _time(() {
+        db.select(
+          'SELECT * FROM transactions '
+          'WHERE transaction_date >= ? AND transaction_date < ? '
+          'ORDER BY transaction_date DESC, id DESC LIMIT 50 OFFSET 0',
+          [monthStart, monthEnd],
+        );
+      });
+      results['monthly_history_page_2'] = _time(() {
+        db.select(
+          'SELECT * FROM transactions '
+          'WHERE transaction_date >= ? AND transaction_date < ? '
+          'ORDER BY transaction_date DESC, id DESC LIMIT 50 OFFSET 50',
+          [monthStart, monthEnd],
+        );
+      });
+      results['monthly_history_type_search'] = _time(() {
+        db.select(
+          'SELECT * FROM transactions '
+          'WHERE type = ? AND transaction_date >= ? AND transaction_date < ? '
+          'AND (category LIKE ? OR description LIKE ? OR payment_method LIKE ?) '
+          'ORDER BY transaction_date DESC, id DESC LIMIT 50 OFFSET 0',
+          ['expense', monthStart, monthEnd, '%makan%', '%makan%', '%makan%'],
+        );
+      });
       results['monthly_summary'] = _time(() {
         db.select(
           'SELECT type, COUNT(id), SUM(amount) FROM transactions '
@@ -77,6 +102,7 @@ void main(List<String> args) {
       for (final entry in results.entries) {
         print('${entry.key}=${entry.value}us');
       }
+      _printExplain(db, monthStart, monthEnd);
     } finally {
       db.dispose();
     }
@@ -88,6 +114,18 @@ int _time(void Function() fn) {
   fn();
   sw.stop();
   return sw.elapsedMicroseconds;
+}
+
+void _printExplain(Database db, int monthStart, int monthEnd) {
+  final rows = db.select(
+    'EXPLAIN QUERY PLAN SELECT * FROM transactions '
+    'WHERE transaction_date >= ? AND transaction_date < ? '
+    'ORDER BY transaction_date DESC, id DESC LIMIT 50 OFFSET 50',
+    [monthStart, monthEnd],
+  );
+  for (final row in rows) {
+    print('monthly_history_explain=${row.values.join(' | ')}');
+  }
 }
 
 void _setup(Database db) {

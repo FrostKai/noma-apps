@@ -77,6 +77,16 @@ abstract class ITransactionRepository {
   Stream<List<Transaction>> watchTransactionsPage({
     String type,
     String searchQuery,
+    int? startMs,
+    int? endMs,
+    int limit,
+    int offset,
+  });
+  Future<List<Transaction>> getTransactionsPage({
+    String type,
+    String searchQuery,
+    int? startMs,
+    int? endMs,
     int limit,
     int offset,
   });
@@ -106,12 +116,19 @@ class TransactionRepository implements ITransactionRepository {
   Stream<List<Transaction>> watchTransactionsPage({
     String type = 'all',
     String searchQuery = '',
+    int? startMs,
+    int? endMs,
     int limit = defaultTransactionPageSize,
     int offset = 0,
   }) {
     final query = _db.select(_db.transactions)
       ..where(
-        (_) => _transactionPredicate(type: type, searchQuery: searchQuery),
+        (_) => _transactionPredicate(
+          type: type,
+          searchQuery: searchQuery,
+          startMs: startMs,
+          endMs: endMs,
+        ),
       )
       ..orderBy([
         (t) => OrderingTerm(
@@ -123,6 +140,36 @@ class TransactionRepository implements ITransactionRepository {
       ..limit(limit, offset: offset);
 
     return query.watch();
+  }
+
+  @override
+  Future<List<Transaction>> getTransactionsPage({
+    String type = 'all',
+    String searchQuery = '',
+    int? startMs,
+    int? endMs,
+    int limit = defaultTransactionPageSize,
+    int offset = 0,
+  }) {
+    final query = _db.select(_db.transactions)
+      ..where(
+        (_) => _transactionPredicate(
+          type: type,
+          searchQuery: searchQuery,
+          startMs: startMs,
+          endMs: endMs,
+        ),
+      )
+      ..orderBy([
+        (t) => OrderingTerm(
+          expression: t.transactionDate,
+          mode: OrderingMode.desc,
+        ),
+        (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+      ])
+      ..limit(limit, offset: offset);
+
+    return query.get();
   }
 
   @override

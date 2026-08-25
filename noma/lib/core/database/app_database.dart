@@ -82,6 +82,7 @@ class AppSettings extends Table {
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
+  AppDatabase.forTesting(super.executor);
 
   @override
   int get schemaVersion => 3;

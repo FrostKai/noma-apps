@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:showcaseview/showcaseview.dart';
 import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
@@ -20,7 +21,6 @@ import '../../transaction/presentation/providers/transaction_provider.dart';
 import '../../transaction/presentation/widgets/transaction_card.dart';
 
 import '../../../shared/widgets/animated_number_counter.dart';
-import '../../../shared/widgets/animated_slide_fade.dart';
 import '../../../shared/widgets/liquid_glass_card.dart';
 import '../../transaction/data/transaction_repository.dart';
 import 'widgets/dashboard_chart_card.dart';
@@ -35,8 +35,15 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   String _filterType = 'all'; // 'all', 'expense', 'income'
-  int _transactionLimit = defaultTransactionPageSize;
+  late DateTime _selectedMonth;
   Timer? _searchDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
+  }
 
   @override
   void dispose() {
@@ -49,16 +56,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final balanceAsync = ref.watch(totalBalanceStreamProvider);
     final incomeAsync = ref.watch(totalIncomeStreamProvider);
     final expenseAsync = ref.watch(totalExpenseStreamProvider);
-    final txPageArgs = (
-      type: _filterType,
-      searchQuery: _searchQuery,
-      limit: _transactionLimit,
-      offset: 0,
-    );
-    final recentTxAsync = ref.watch(transactionsPageStreamProvider(txPageArgs));
     final now = DateTime.now();
     final monthStart = DateTime(now.year, now.month);
     final nextMonthStart = DateTime(now.year, now.month + 1);
+    final historyMonthStart = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month,
+    );
+    final historyNextMonthStart = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + 1,
+    );
+    final historyArgs = (
+      type: _filterType,
+      searchQuery: _searchQuery,
+      startMs: historyMonthStart.millisecondsSinceEpoch,
+      endMs: historyNextMonthStart.millisecondsSinceEpoch,
+      pageSize: defaultTransactionPageSize,
+    );
+    final historyState = ref.watch(
+      transactionHistoryControllerProvider(historyArgs),
+    );
     final monthlySummaryAsync = ref.watch(
       transactionSummaryStreamProvider((
         startMs: monthStart.millisecondsSinceEpoch,
@@ -85,7 +103,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(transactionsPageStreamProvider(txPageArgs));
+            await ref
+                .read(
+                  transactionHistoryControllerProvider(historyArgs).notifier,
+                )
+                .loadInitial();
             ref.invalidate(
               transactionSummaryStreamProvider((
                 startMs: monthStart.millisecondsSinceEpoch,
@@ -94,89 +116,103 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             );
             ref.invalidate(totalBalanceStreamProvider);
           },
-          child: SingleChildScrollView(
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with Time-Based Greeting
-                _buildHeader(context),
-                const SizedBox(height: 20),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(20),
+                sliver: SliverList.list(
+                  children: [
+                    // Header with Time-Based Greeting
+                    _buildHeader(context),
+                    const SizedBox(height: 20),
 
-                // Glass Balance Card (Real-time Stream)
-                Showcase(
-                  key: ProductTourKeys.balanceCard,
-                  title: 'Saldo Utama',
-                  description:
-                      'Selamat datang di Noma! Ini ringkasan saldo, pemasukan & pengeluaran Anda.',
-                  targetBorderRadius: BorderRadius.circular(24),
-                  targetPadding: const EdgeInsets.all(4),
-                  tooltipBackgroundColor: tourTooltipBg,
-                  titleTextStyle: tourTitleStyle,
-                  descTextStyle: tourDescStyle,
-                  child: _buildBalanceCard(
-                    balanceAsync,
-                    incomeAsync,
-                    expenseAsync,
-                  ),
+                    // Glass Balance Card (Real-time Stream)
+                    Showcase(
+                      key: ProductTourKeys.balanceCard,
+                      title: 'Saldo Utama',
+                      description:
+                          'Selamat datang di Noma! Ini ringkasan saldo, pemasukan & pengeluaran Anda.',
+                      targetBorderRadius: BorderRadius.circular(24),
+                      targetPadding: const EdgeInsets.all(4),
+                      tooltipBackgroundColor: tourTooltipBg,
+                      titleTextStyle: tourTitleStyle,
+                      descTextStyle: tourDescStyle,
+                      child: _buildBalanceCard(
+                        balanceAsync,
+                        incomeAsync,
+                        expenseAsync,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Donut Chart + 7-Day Mini Bar Chart Card
+                    Showcase(
+                      key: ProductTourKeys.dashboardChart,
+                      title: 'Grafik Keuangan',
+                      description:
+                          'Pantau distribusi pengeluaran dan perbandingan 7 hari terakhir.',
+                      targetBorderRadius: BorderRadius.circular(24),
+                      targetPadding: const EdgeInsets.all(4),
+                      tooltipBackgroundColor: tourTooltipBg,
+                      titleTextStyle: tourTitleStyle,
+                      descTextStyle: tourDescStyle,
+                      child: const DashboardChartCard(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Monthly summary card
+                    Showcase(
+                      key: ProductTourKeys.aiSmartInput,
+                      title: 'Ringkasan Bulan Ini',
+                      description:
+                          'Lihat performa pemasukan dan pengeluaran bulan berjalan.',
+                      targetBorderRadius: BorderRadius.circular(20),
+                      targetPadding: const EdgeInsets.all(4),
+                      tooltipBackgroundColor: tourTooltipBg,
+                      titleTextStyle: tourTitleStyle,
+                      descTextStyle: tourDescStyle,
+                      child: _buildMonthlySummaryCard(
+                        context,
+                        monthlySummaryAsync,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Recent Transactions Header & Search/Filter
+                    Text(
+                      'Riwayat Transaksi',
+                      style: AppTypography.headingMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMonthSelector(context),
+                    const SizedBox(height: 12),
+
+                    // Search & Filter Bar
+                    Showcase(
+                      key: ProductTourKeys.recentTx,
+                      title: 'Riwayat Transaksi',
+                      description:
+                          'Semua transaksi tercatat di sini.\nGunakan pencarian dan filter untuk menemukan transaksi.',
+                      targetBorderRadius: BorderRadius.circular(16),
+                      targetPadding: const EdgeInsets.all(4),
+                      tooltipBackgroundColor: tourTooltipBg,
+                      titleTextStyle: tourTitleStyle,
+                      descTextStyle: tourDescStyle,
+                      child: _buildSearchAndFilterBar(context),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                const SizedBox(height: 20),
-
-                // Donut Chart + 7-Day Mini Bar Chart Card
-                Showcase(
-                  key: ProductTourKeys.dashboardChart,
-                  title: 'Grafik Keuangan',
-                  description:
-                      'Pantau distribusi pengeluaran dan perbandingan 7 hari terakhir.',
-                  targetBorderRadius: BorderRadius.circular(24),
-                  targetPadding: const EdgeInsets.all(4),
-                  tooltipBackgroundColor: tourTooltipBg,
-                  titleTextStyle: tourTitleStyle,
-                  descTextStyle: tourDescStyle,
-                  child: const DashboardChartCard(),
-                ),
-                const SizedBox(height: 20),
-
-                // Monthly summary card
-                Showcase(
-                  key: ProductTourKeys.aiSmartInput,
-                  title: 'Ringkasan Bulan Ini',
-                  description:
-                      'Lihat performa pemasukan dan pengeluaran bulan berjalan.',
-                  targetBorderRadius: BorderRadius.circular(20),
-                  targetPadding: const EdgeInsets.all(4),
-                  tooltipBackgroundColor: tourTooltipBg,
-                  titleTextStyle: tourTitleStyle,
-                  descTextStyle: tourDescStyle,
-                  child: _buildMonthlySummaryCard(context, monthlySummaryAsync),
-                ),
-                const SizedBox(height: 28),
-
-                // Recent Transactions Header & Search/Filter
-                Text('Riwayat Transaksi', style: AppTypography.headingMedium),
-                const SizedBox(height: 12),
-
-                // Search & Filter Bar
-                Showcase(
-                  key: ProductTourKeys.recentTx,
-                  title: 'Riwayat Transaksi',
-                  description:
-                      'Semua transaksi tercatat di sini.\nGunakan pencarian dan filter untuk menemukan transaksi.',
-                  targetBorderRadius: BorderRadius.circular(16),
-                  targetPadding: const EdgeInsets.all(4),
-                  tooltipBackgroundColor: tourTooltipBg,
-                  titleTextStyle: tourTitleStyle,
-                  descTextStyle: tourDescStyle,
-                  child: _buildSearchAndFilterBar(context),
-                ),
-                const SizedBox(height: 16),
-
-                // Recent Transactions List (Filtered Real-time Stream)
-                _buildRecentTransactionsList(context, ref, recentTxAsync),
-                const SizedBox(height: 100),
-              ],
-            ),
+              ),
+              _buildRecentTransactionsSliver(
+                context,
+                ref,
+                historyArgs,
+                historyState,
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
           ),
         ),
       ),
@@ -541,7 +577,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (!mounted) return;
               setState(() {
                 _searchQuery = val.trim().toLowerCase();
-                _transactionLimit = defaultTransactionPageSize;
               });
             });
           },
@@ -598,7 +633,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onSelected: (_) {
                   setState(() {
                     _filterType = f['key']!;
-                    _transactionLimit = defaultTransactionPageSize;
                   });
                 },
               ),
@@ -609,17 +643,121 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildRecentTransactionsList(
+  Widget _buildMonthSelector(BuildContext context) {
+    final colors = AppColorScheme.of(context);
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    final canGoNext = _selectedMonth.isBefore(currentMonth);
+    final label = DateFormat(
+      'MMMM yyyy',
+      'id_ID',
+    ).format(_selectedMonth).toUpperCase();
+
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      borderRadius: 16,
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Bulan sebelumnya',
+            onPressed: () => _changeMonth(-1),
+            icon: Icon(
+              Icons.chevron_left_rounded,
+              color: colors.textPrimary,
+              size: 26,
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                label,
+                style: AppTypography.labelLarge.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Bulan berikutnya',
+            onPressed: canGoNext ? () => _changeMonth(1) : null,
+            icon: Icon(
+              Icons.chevron_right_rounded,
+              color: canGoNext ? colors.textPrimary : colors.textMuted,
+              size: 26,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _changeMonth(int delta) {
+    final next = DateTime(_selectedMonth.year, _selectedMonth.month + delta);
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    if (next.isAfter(currentMonth)) return;
+    setState(() {
+      _selectedMonth = next;
+    });
+  }
+
+  Widget _buildRecentTransactionsSliver(
     BuildContext context,
     WidgetRef ref,
-    AsyncValue<List<Transaction>> recentTxAsync,
+    TransactionHistoryArgs historyArgs,
+    TransactionHistoryState historyState,
   ) {
-    return recentTxAsync.when(
-      data: (transactions) {
-        final filtered = transactions;
+    if (historyState.isInitialLoading) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        ),
+      );
+    }
 
-        if (filtered.isEmpty) {
-          return GlassCard(
+    if (historyState.error != null && historyState.transactions.isEmpty) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        sliver: SliverToBoxAdapter(
+          child: GlassCard(
+            child: Column(
+              children: [
+                Text(
+                  'Error memuat transaksi: ${historyState.error}',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.expense,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GlassButton(
+                  label: 'Coba Lagi',
+                  icon: Icons.refresh_rounded,
+                  variant: GlassButtonVariant.secondary,
+                  height: 42,
+                  onPressed: () => ref
+                      .read(
+                        transactionHistoryControllerProvider(
+                          historyArgs,
+                        ).notifier,
+                      )
+                      .loadInitial(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (historyState.transactions.isEmpty) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        sliver: SliverToBoxAdapter(
+          child: GlassCard(
             padding: const EdgeInsets.all(22),
             borderRadius: 16,
             child: Center(
@@ -641,7 +779,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text(
                     _searchQuery.isNotEmpty
                         ? 'Transaksi tidak ditemukan'
-                        : 'Belum ada transaksi',
+                        : 'Belum ada transaksi di bulan ini',
                     style: AppTypography.headingSmall.copyWith(
                       color: AppColorScheme.of(context).textSecondary,
                     ),
@@ -684,89 +822,183 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-          );
-        }
+          ),
+        ),
+      );
+    }
 
-        return Column(
-          children: [
-            ...filtered.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final tx = entry.value;
+    final rows = _buildHistoryRows(historyState.transactions);
+    final itemCount = rows.length + 1;
 
-              return AnimatedSlideFade(
-                index: idx,
-                child: TransactionCard(
-                  transaction: tx,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            AddTransactionScreen(initialTransaction: tx),
-                      ),
-                    );
-                  },
-                  onDelete: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Hapus Transaksi?'),
-                        content: Text(
-                          'Yakin ingin menghapus transaksi ${tx.category} senilai ${CurrencyFormatter.formatRupiah(tx.amount)}?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Batal'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text(
-                              'Hapus',
-                              style: TextStyle(color: AppColors.expense),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList.builder(
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          if (index == rows.length) {
+            return _buildHistoryFooter(context, ref, historyArgs, historyState);
+          }
 
-                    if (confirm == true) {
-                      ref
-                          .read(transactionControllerProvider.notifier)
-                          .deleteTransaction(tx.id);
-                    }
-                  },
+          final row = rows[index];
+          if (row.header != null) {
+            return _buildDateHeader(context, row.header!);
+          }
+
+          final tx = row.transaction!;
+          return TransactionCard(
+            transaction: tx,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AddTransactionScreen(initialTransaction: tx),
                 ),
               );
-            }),
-            if (filtered.length == _transactionLimit) ...[
-              const SizedBox(height: 12),
-              GlassButton(
-                label: 'Muat Lagi',
-                icon: Icons.expand_more_rounded,
-                variant: GlassButtonVariant.secondary,
-                height: 44,
-                onPressed: () {
-                  setState(() {
-                    _transactionLimit += defaultTransactionPageSize;
-                  });
-                },
-              ),
-            ],
-          ],
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.all(20),
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      ),
-      error: (err, _) => GlassCard(
-        child: Text(
-          'Error memuat transaksi: $err',
-          style: AppTypography.caption.copyWith(color: AppColors.expense),
-        ),
+            },
+            onDelete: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Hapus Transaksi?'),
+                  content: Text(
+                    'Yakin ingin menghapus transaksi ${tx.category} senilai ${CurrencyFormatter.formatRupiah(tx.amount)}?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Batal'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text(
+                        'Hapus',
+                        style: TextStyle(color: AppColors.expense),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                final success = await ref
+                    .read(transactionControllerProvider.notifier)
+                    .deleteTransaction(tx.id);
+                if (success) {
+                  ref
+                      .read(
+                        transactionHistoryControllerProvider(
+                          historyArgs,
+                        ).notifier,
+                      )
+                      .removeTransaction(tx.id);
+                }
+              }
+            },
+          );
+        },
       ),
     );
   }
+
+  Widget _buildDateHeader(BuildContext context, DateTime date) {
+    final colors = AppColorScheme.of(context);
+    final label = DateFormat('d MMMM', 'id_ID').format(date).toUpperCase();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: colors.textMuted,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Divider(color: colors.glassBorder)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryFooter(
+    BuildContext context,
+    WidgetRef ref,
+    TransactionHistoryArgs historyArgs,
+    TransactionHistoryState historyState,
+  ) {
+    if (historyState.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 18),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (historyState.error != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 12),
+        child: GlassButton(
+          label: 'Coba Lagi',
+          icon: Icons.refresh_rounded,
+          variant: GlassButtonVariant.secondary,
+          height: 44,
+          onPressed: () => ref
+              .read(transactionHistoryControllerProvider(historyArgs).notifier)
+              .loadMore(),
+        ),
+      );
+    }
+
+    if (!historyState.hasMore) {
+      return const SizedBox(height: 8);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: GlassButton(
+        label: 'Muat Lagi',
+        icon: Icons.expand_more_rounded,
+        variant: GlassButtonVariant.secondary,
+        height: 44,
+        onPressed: () => ref
+            .read(transactionHistoryControllerProvider(historyArgs).notifier)
+            .loadMore(),
+      ),
+    );
+  }
+
+  List<_HistoryRow> _buildHistoryRows(List<Transaction> transactions) {
+    final rows = <_HistoryRow>[];
+    DateTime? lastDay;
+
+    for (final tx in transactions) {
+      final date = DateTime.fromMillisecondsSinceEpoch(tx.transactionDate);
+      final day = DateTime(date.year, date.month, date.day);
+      if (lastDay != day) {
+        rows.add(_HistoryRow.header(day));
+        lastDay = day;
+      }
+      rows.add(_HistoryRow.transaction(tx));
+    }
+
+    return rows;
+  }
+}
+
+class _HistoryRow {
+  final DateTime? header;
+  final Transaction? transaction;
+
+  const _HistoryRow.header(this.header) : transaction = null;
+  const _HistoryRow.transaction(this.transaction) : header = null;
 }
