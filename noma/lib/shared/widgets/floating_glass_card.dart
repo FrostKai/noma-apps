@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/theme/glass_theme.dart';
 import 'bouncy_tap.dart';
 
@@ -10,8 +10,8 @@ class FloatingGlassCard extends StatefulWidget {
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final double borderRadius;
-  final Color backgroundColor;
-  final Color borderColor;
+  final Color? backgroundColor;
+  final Color? borderColor;
   final VoidCallback? onTap;
   final double floatDistance;
   final Duration duration;
@@ -24,8 +24,8 @@ class FloatingGlassCard extends StatefulWidget {
     this.padding = const EdgeInsets.all(16),
     this.margin,
     this.borderRadius = GlassTheme.borderRadiusMedium,
-    this.backgroundColor = AppColors.glassCard,
-    this.borderColor = AppColors.glassBorder,
+    this.backgroundColor,
+    this.borderColor,
     this.onTap,
     this.floatDistance = 0.0, // Default to 0.0 (Static, no floating motion)
     this.duration = const Duration(milliseconds: 2800),
@@ -81,6 +81,14 @@ class _FloatingGlassCardState extends State<FloatingGlassCard> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
+    final isLight = AppColorScheme.isLight(context);
+    final bgColor = widget.backgroundColor ?? colors.glassCard;
+    final bdColor = widget.borderColor ?? colors.glassBorder;
+    final shadowColor = isLight
+        ? Colors.black.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.35);
+
     final hasMotion = widget.floatDistance > 0.0 && _controller != null;
 
     Widget cardContent = Container(
@@ -88,24 +96,29 @@ class _FloatingGlassCardState extends State<FloatingGlassCard> with SingleTicker
       height: widget.height,
       padding: widget.padding,
       decoration: BoxDecoration(
-        color: widget.backgroundColor,
+        color: bgColor,
         borderRadius: BorderRadius.circular(widget.borderRadius),
         border: Border.all(
-          color: widget.borderColor,
+          color: bdColor,
           width: 1.0,
         ),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.1),
-            Colors.white.withValues(alpha: 0.02),
-          ],
+          colors: isLight
+              ? [
+                  Colors.white.withValues(alpha: 0.8),
+                  Colors.white.withValues(alpha: 0.5),
+                ]
+              : [
+                  Colors.white.withValues(alpha: 0.1),
+                  Colors.white.withValues(alpha: 0.02),
+                ],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: hasMotion ? _shadowBlurAnimation!.value : 28.0,
+            color: shadowColor,
+            blurRadius: hasMotion ? _shadowBlurAnimation!.value : (isLight ? 16.0 : 28.0),
             spreadRadius: 0,
             offset: Offset(0, hasMotion ? 8 - (_translationAnimation!.value * 0.5) : 8),
           ),

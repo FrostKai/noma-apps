@@ -9,15 +9,45 @@ final transactionRepositoryProvider = Provider<ITransactionRepository>((ref) {
   return TransactionRepository(db);
 });
 
-final allTransactionsStreamProvider = StreamProvider.autoDispose<List<Transaction>>((ref) {
-  final repo = ref.watch(transactionRepositoryProvider);
-  return repo.watchAllTransactions();
+typedef TransactionPageArgs = ({
+  String type,
+  String searchQuery,
+  int limit,
+  int offset,
 });
 
-final recentTransactionsStreamProvider = StreamProvider.autoDispose<List<Transaction>>((ref) {
-  final repo = ref.watch(transactionRepositoryProvider);
-  return repo.watchRecentTransactions(limit: 10);
-});
+final transactionsPageStreamProvider = StreamProvider.autoDispose
+    .family<List<Transaction>, TransactionPageArgs>((ref, args) {
+      final repo = ref.watch(transactionRepositoryProvider);
+      return repo.watchTransactionsPage(
+        type: args.type,
+        searchQuery: args.searchQuery,
+        limit: args.limit,
+        offset: args.offset,
+      );
+    });
+
+typedef SummaryRangeArgs = ({int? startMs, int? endMs});
+
+final transactionSummaryStreamProvider = StreamProvider.autoDispose
+    .family<TransactionSummary, SummaryRangeArgs>((ref, args) {
+      final repo = ref.watch(transactionRepositoryProvider);
+      return repo.watchSummary(startMs: args.startMs, endMs: args.endMs);
+    });
+
+final reportDataStreamProvider = StreamProvider.autoDispose
+    .family<ReportData, SummaryRangeArgs>((ref, args) {
+      final repo = ref.watch(transactionRepositoryProvider);
+      return repo.watchReportData(startMs: args.startMs, endMs: args.endMs);
+    });
+
+typedef DailyTotalsArgs = ({int startMs, int endMs});
+
+final dailyTotalsStreamProvider = StreamProvider.autoDispose
+    .family<List<DailyTransactionTotal>, DailyTotalsArgs>((ref, args) {
+      final repo = ref.watch(transactionRepositoryProvider);
+      return repo.watchDailyTotals(startMs: args.startMs, endMs: args.endMs);
+    });
 
 final totalIncomeStreamProvider = StreamProvider.autoDispose<double>((ref) {
   final repo = ref.watch(transactionRepositoryProvider);
@@ -34,9 +64,10 @@ final totalBalanceStreamProvider = StreamProvider.autoDispose<double>((ref) {
   return repo.watchTotalBalance();
 });
 
-final transactionControllerProvider = StateNotifierProvider<TransactionController, AsyncValue<void>>((ref) {
-  return TransactionController(ref.watch(transactionRepositoryProvider));
-});
+final transactionControllerProvider =
+    StateNotifierProvider<TransactionController, AsyncValue<void>>((ref) {
+      return TransactionController(ref.watch(transactionRepositoryProvider));
+    });
 
 class TransactionController extends StateNotifier<AsyncValue<void>> {
   final ITransactionRepository _repo;
@@ -52,6 +83,7 @@ class TransactionController extends StateNotifier<AsyncValue<void>> {
     String? paymentMethod,
     String? receiptImagePath,
     required DateTime transactionDate,
+    List<TransactionItemInput> items = const [],
   }) async {
     state = const AsyncLoading();
     try {
@@ -68,7 +100,7 @@ class TransactionController extends StateNotifier<AsyncValue<void>> {
         createdAt: now,
         updatedAt: now,
       );
-      await _repo.addTransaction(companion);
+      await _repo.addTransaction(companion, items: items);
       state = const AsyncData(null);
       return true;
     } catch (e, stack) {

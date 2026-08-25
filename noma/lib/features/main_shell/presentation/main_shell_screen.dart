@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/product_tour_keys.dart';
@@ -23,10 +24,7 @@ final activeTabProvider = StateProvider<int>((ref) => 0);
 class MainShellScreen extends ConsumerStatefulWidget {
   final int initialIndex;
 
-  const MainShellScreen({
-    super.key,
-    this.initialIndex = 0,
-  });
+  const MainShellScreen({super.key, this.initialIndex = 0});
 
   @override
   ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
@@ -157,6 +155,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
       }
     });
 
+    // ignore: deprecated_member_use
     return ShowCaseWidget(
       enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 400),
@@ -185,7 +184,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
                 ProductTourKeys.navBeranda,
                 ProductTourKeys.dashboardChart,
                 ProductTourKeys.aiSmartInput,
-                ProductTourKeys.quickActions,
                 ProductTourKeys.recentTx,
                 ProductTourKeys.navNomiAI,
                 ProductTourKeys.navTambah,
@@ -243,73 +241,65 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
       blurValue: 1.0,
       builder: (ctx) {
         _showcaseContext = ctx;
+        final colors = AppColorScheme.of(context);
         return Scaffold(
-            backgroundColor: AppColors.background,
-            resizeToAvoidBottomInset: false,
-            body: GlassReflectionBackground(
-              child: Stack(
-                children: [
-                  // PageView with smooth swipe gestures between tabs
-                  PageView(
-                    controller: _pageController,
-                    physics: const BouncingScrollPhysics(),
-                    onPageChanged: (index) {
-                      if (_currentIndex != index) {
-                        setState(() {
-                          _currentIndex = index;
-                        });
-                        ref.read(activeTabProvider.notifier).state = index;
-                      }
-                    },
-                    children: _pages,
+          backgroundColor: colors.background,
+          resizeToAvoidBottomInset: false,
+          body: GlassReflectionBackground(
+            child: Stack(
+              children: [
+                // PageView with smooth swipe gestures between tabs
+                PageView(
+                  controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (index) {
+                    if (_currentIndex != index) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                      ref.read(activeTabProvider.notifier).state = index;
+                    }
+                  },
+                  children: _pages,
+                ),
+
+                // Semi-transparent Scrim Overlay when FAB is expanded
+                if (_isFabExpanded)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _toggleFab,
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedBuilder(
+                        animation: fabController,
+                        builder: (context, child) {
+                          return Container(
+                            color: Colors.black.withValues(
+                              alpha: 0.55 * fabController.value,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
 
-                  // Semi-transparent Scrim Overlay when FAB is expanded
-                  if (_isFabExpanded)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: _toggleFab,
-                        behavior: HitTestBehavior.opaque,
-                        child: AnimatedBuilder(
-                          animation: fabController,
-                          builder: (context, child) {
-                            return Container(
-                              color: Colors.black.withValues(
-                                alpha: 0.55 * fabController.value,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                // Floating Navigation Bar
+                if (!isKeyboardOpen)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: _buildFloatingGlassNavBar(context),
+                  ),
 
-                  // Floating Navigation Bar
-                  if (!isKeyboardOpen)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 16,
-                      child: _buildFloatingGlassNavBar(context),
-                    ),
-
-                  // Fanned Action Buttons Container (Rendered ON TOP of Navigation Bar)
-                  if (!isKeyboardOpen)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 100,
-                      child: IgnorePointer(
-                        ignoring: !_isFabExpanded,
-                        child: _buildFannedActionButtons(),
-                      ),
-                    ),
-                ],
-              ),
+                // Fanned Action Buttons Container (Rendered ON TOP of Navigation Bar)
+                if (!isKeyboardOpen && _isFabExpanded)
+                  Positioned.fill(child: _buildFannedActionButtons()),
+              ],
             ),
-          );
-        },
-      );
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildFannedActionButtons() {
@@ -372,7 +362,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
         }
 
         return Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
           children: actions.map((item) {
             final anim = item['anim'] as Animation<double>;
@@ -384,71 +374,73 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
             final currentOffset = Offset(
               offset.dx * anim.value,
-              offset.dy * anim.value,
+              -64 + (offset.dy * anim.value),
             );
             final scale = 0.4 + (0.6 * anim.value.clamp(0.0, 1.5));
             final opacity = anim.value.clamp(0.0, 1.0);
 
             return Transform.translate(
               offset: currentOffset,
-              child: Transform.scale(
-                scale: scale,
-                child: Opacity(
-                  opacity: opacity,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BouncyTap(
-                        onTap: onTap,
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.backgroundSecondary.withValues(alpha: 0.95),
-                            border: Border.all(
-                              color: color.withValues(alpha: 0.7),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: color.withValues(alpha: 0.4),
-                                blurRadius: 16,
-                                spreadRadius: 1,
+              child: Opacity(
+                opacity: opacity,
+                child: BouncyTap(
+                  onTap: onTap,
+                  child: Transform.scale(
+                    scale: scale,
+                    child: SizedBox(
+                      width: 82,
+                      height: 78,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColorScheme.of(
+                                context,
+                              ).backgroundSecondary.withValues(alpha: 0.95),
+                              border: Border.all(
+                                color: color.withValues(alpha: 0.7),
+                                width: 1.5,
                               ),
-                            ],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withValues(alpha: 0.4),
+                                  blurRadius: 16,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Icon(icon, color: color, size: 22),
                           ),
-                          child: Icon(
-                            icon,
-                            color: color,
-                            size: 22,
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              label,
+                              style: AppTypography.caption.copyWith(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          label,
-                          style: AppTypography.caption.copyWith(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -460,6 +452,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   }
 
   Widget _buildFloatingGlassNavBar(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     final navItems = [
       {'icon': Icons.grid_view_rounded, 'label': 'Beranda'},
       {'icon': Icons.auto_awesome_rounded, 'label': 'Nomi AI'},
@@ -476,12 +469,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
           height: 68,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: AppColors.backgroundSecondary.withValues(alpha: 0.85),
+            color: colors.navBarBackground,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-              width: 1.0,
-            ),
+            border: Border.all(color: colors.navBarBorder, width: 1.0),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.45),
@@ -560,7 +550,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
                         size: 23,
                         color: isSelected
                             ? AppColors.primary
-                            : AppColors.textMuted,
+                            : colors.textMuted,
                       ),
                     ),
                   ),
@@ -637,10 +627,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
                     : AppColors.primaryGradient,
                 boxShadow: [
                   BoxShadow(
-                    color: (_isFabExpanded
-                            ? AppColors.expense
-                            : AppColors.primary)
-                        .withValues(alpha: 0.5),
+                    color:
+                        (_isFabExpanded ? AppColors.expense : AppColors.primary)
+                            .withValues(alpha: 0.5),
                     blurRadius: 20,
                     spreadRadius: 2,
                     offset: const Offset(0, 4),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/constants/app_color_scheme.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/api_key_service.dart';
@@ -94,6 +95,7 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return FloatingGlassCard(
       padding: const EdgeInsets.all(16),
       borderRadius: 20,
@@ -121,10 +123,10 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
                 child: TextField(
                   controller: _textController,
                   enabled: !_isLoading,
-                  style: AppTypography.bodyMedium,
+                  style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary),
                   decoration: InputDecoration(
                     hintText: "Contoh: 'Beli nasi goreng 25rb pake OVO'",
-                    hintStyle: AppTypography.caption.copyWith(color: AppColors.textMuted),
+                    hintStyle: AppTypography.caption.copyWith(color: colors.textMuted),
                     border: InputBorder.none,
                     isDense: true,
                   ),

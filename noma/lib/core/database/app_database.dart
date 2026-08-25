@@ -19,11 +19,24 @@ class Transactions extends Table {
   TextColumn get category => text()();
   TextColumn get description => text().nullable()();
   TextColumn get source => text()(); // 'manual' | 'ai_text' | 'receipt_scan'
-  TextColumn get paymentMethod => text().nullable()(); // 'Tunai' | 'Gopay' | 'OVO' | dll
+  TextColumn get paymentMethod =>
+      text().nullable()(); // 'Tunai' | 'Gopay' | 'OVO' | dll
   TextColumn get receiptImagePath => text().nullable()();
   IntColumn get transactionDate => integer()(); // Timestamp in ms
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
+}
+
+@DataClassName('TransactionItem')
+class TransactionItems extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get transactionId =>
+      integer().references(Transactions, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  RealColumn get quantity => real().withDefault(const Constant(1.0))();
+  RealColumn get unitPrice => real().nullable()();
+  RealColumn get totalPrice => real()();
+  IntColumn get createdAt => integer()();
 }
 
 @DataClassName('Category')
@@ -58,20 +71,56 @@ class AppSettings extends Table {
 // DRIFT DATABASE SETUP & SEEDING
 // ============================================================
 
-@DriftDatabase(tables: [Transactions, Categories, ChatMessages, AppSettings])
+@DriftDatabase(
+  tables: [
+    Transactions,
+    TransactionItems,
+    Categories,
+    ChatMessages,
+    AppSettings,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-          await _seedDefaultCategories();
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+      await _createPerformanceIndexes();
+      await _seedDefaultCategories();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(transactionItems);
+      }
+      if (from < 3) {
+        await _createPerformanceIndexes();
+      }
+    },
+  );
+
+  Future<void> _createPerformanceIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_date_id '
+      'ON transactions(transaction_date DESC, id DESC);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_type_date '
+      'ON transactions(type, transaction_date);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_category_date '
+      'ON transactions(category, transaction_date);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transaction_items_transaction_id '
+      'ON transaction_items(transaction_id);',
+    );
+  }
 
   Future<void> _seedDefaultCategories() async {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -207,4 +256,3 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 }
-

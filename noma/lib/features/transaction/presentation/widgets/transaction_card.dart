@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_color_scheme.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -49,6 +50,7 @@ class TransactionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     final date = DateTime.fromMillisecondsSinceEpoch(transaction.transactionDate);
     final accentColor = isIncome ? AppColors.income : AppColors.expense;
 
@@ -83,7 +85,7 @@ class TransactionCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         transaction.category,
-                        style: AppTypography.labelLarge,
+                        style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -93,13 +95,13 @@ class TransactionCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         margin: const EdgeInsets.only(left: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.glassSurface,
+                          color: colors.glassSurface,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.glassBorder),
+                          border: Border.all(color: colors.glassBorder),
                         ),
                         child: Text(
                           transaction.paymentMethod!,
-                          style: AppTypography.caption.copyWith(fontSize: 10),
+                          style: AppTypography.caption.copyWith(fontSize: 10, color: colors.textSecondary),
                         ),
                       ),
                   ],
@@ -109,14 +111,14 @@ class TransactionCard extends StatelessWidget {
                   children: [
                     Text(
                       DateFormatter.formatRelative(date),
-                      style: AppTypography.caption,
+                      style: AppTypography.caption.copyWith(color: colors.textMuted),
                     ),
                     if (transaction.description != null && transaction.description!.isNotEmpty) ...[
-                      Text(' • ', style: AppTypography.caption),
+                      Text(' • ', style: AppTypography.caption.copyWith(color: colors.textMuted)),
                       Expanded(
                         child: Text(
                           transaction.description!,
-                          style: AppTypography.caption,
+                          style: AppTypography.caption.copyWith(color: colors.textMuted),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -145,11 +147,11 @@ class TransactionCard extends StatelessWidget {
                 InkWell(
                   onTap: onDelete,
                   borderRadius: BorderRadius.circular(12),
-                  child: const Padding(
-                    padding: EdgeInsets.all(2),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
                     child: Icon(
                       Icons.delete_outline_rounded,
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                       size: 16,
                     ),
                   ),

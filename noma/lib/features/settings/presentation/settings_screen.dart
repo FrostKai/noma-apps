@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_images.dart';
@@ -12,6 +13,7 @@ import '../../../core/constants/product_tour_keys.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/product_tour_service.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/providers/theme_provider.dart';
 import '../../../shared/widgets/ai_key_setup_modal.dart';
 import '../../../shared/widgets/glass_button.dart';
 import '../../../shared/widgets/glass_card.dart';
@@ -52,6 +54,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     const tourTooltipBg = Color(0xE61A1A2E);
     const tourTitleStyle = TextStyle(
       color: Colors.white,
@@ -65,15 +68,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: Text('Pengaturan', style: AppTypography.headingMedium),
+        title: Text('Pengaturan', style: AppTypography.headingMedium.copyWith(color: colors.textPrimary)),
         automaticallyImplyLeading: false,
         leading: Navigator.of(context).canPop()
             ? IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: AppColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
               )
@@ -82,6 +85,145 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          // Theme Switcher Section
+          Text('Tampilan & Tema', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
+          const SizedBox(height: 8),
+          Builder(builder: (context) {
+            final themeMode = ref.watch(themeModeProvider);
+            return GlassCard(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      themeMode == ThemeMode.light
+                          ? Icons.light_mode_rounded
+                          : Icons.dark_mode_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tema Aplikasi',
+                          style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
+                        ),
+                        Text(
+                          themeMode == ThemeMode.light
+                              ? 'Mode Terang (Warm Platinum)'
+                              : 'Mode Gelap (Midnight Obsidian)',
+                          style: AppTypography.caption.copyWith(color: colors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Segmented Pill Switch
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: colors.background.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: colors.glassBorder),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Dark Mode Option Button
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: themeMode == ThemeMode.dark
+                                  ? AppColors.primary.withValues(alpha: 0.25)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              border: themeMode == ThemeMode.dark
+                                  ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                                  : null,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.dark_mode_rounded,
+                                  size: 14,
+                                  color: themeMode == ThemeMode.dark
+                                      ? AppColors.primary
+                                      : colors.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Gelap',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: themeMode == ThemeMode.dark
+                                        ? AppColors.primary
+                                        : colors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // Light Mode Option Button
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: themeMode == ThemeMode.light
+                                  ? AppColors.primary.withValues(alpha: 0.25)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              border: themeMode == ThemeMode.light
+                                  ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                                  : null,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.light_mode_rounded,
+                                  size: 14,
+                                  color: themeMode == ThemeMode.light
+                                      ? AppColors.primary
+                                      : colors.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Terang',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: themeMode == ThemeMode.light
+                                        ? AppColors.primary
+                                        : colors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 16),
           // Category Management Menu
           Showcase(
             key: ProductTourKeys.settingsCategory,
@@ -116,18 +258,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Text(
                           'Manajemen Kategori',
-                          style: AppTypography.labelLarge,
+                          style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
                         ),
                         Text(
                           'Atur kategori pemasukan & pengeluaran',
-                          style: AppTypography.caption,
+                          style: AppTypography.caption.copyWith(color: colors.textMuted),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ],
               ),
@@ -136,7 +278,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 16),
 
           // Daily Night Notification Section
-          Text('Notifikasi & Pengingat', style: AppTypography.labelMedium),
+          Text('Notifikasi & Pengingat', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
           const SizedBox(height: 8),
           Showcase(
             key: ProductTourKeys.settingsNotification,
@@ -172,13 +314,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           children: [
                             Text(
                               'Pengingat Catat Harian',
-                              style: AppTypography.labelLarge,
+                              style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
                             ),
                             Text(
                               _notificationEnabled
                                   ? 'Noma akan mengingatkan kamu setiap hari jam ${_formatTime(_notificationTime)}'
                                   : 'Aktifkan agar tidak lupa mencatat transaksi',
-                              style: AppTypography.caption,
+                              style: AppTypography.caption.copyWith(color: colors.textMuted),
                             ),
                           ],
                         ),
@@ -192,7 +334,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  const Divider(color: AppColors.glassBorder),
+                  Divider(color: colors.glassBorder),
                   const SizedBox(height: 8),
                   InkWell(
                     borderRadius: BorderRadius.circular(14),
@@ -203,9 +345,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.background.withValues(alpha: 0.28),
+                        color: colors.background.withValues(alpha: 0.28),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.glassBorder),
+                        border: Border.all(color: colors.glassBorder),
                       ),
                       child: Row(
                         children: [
@@ -221,11 +363,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               children: [
                                 Text(
                                   'Jam Pengingat',
-                                  style: AppTypography.labelLarge,
+                                  style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
                                 ),
                                 Text(
                                   'Ketuk untuk mengubah waktu notifikasi harian',
-                                  style: AppTypography.caption,
+                                  style: AppTypography.caption.copyWith(color: colors.textMuted),
                                 ),
                               ],
                             ),
@@ -293,7 +435,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 16),
 
           // AI Integration Info & API Key Setup
-          Text('Kecerdasan Buatan (AI)', style: AppTypography.labelMedium),
+          Text('Kecerdasan Buatan (AI)', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
           const SizedBox(height: 8),
           Showcase(
             key: ProductTourKeys.settingsAiKey,
@@ -330,11 +472,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Text(
                           'Groq Cloud AI (Llama 3.3 70B)',
-                          style: AppTypography.labelLarge,
+                          style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
                         ),
                         Text(
                           'Ketuk untuk atur API Key gratis',
-                          style: AppTypography.caption,
+                          style: AppTypography.caption.copyWith(color: colors.textMuted),
                         ),
                       ],
                     ),
@@ -363,7 +505,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 16),
 
           // Help & Product Tour Repeat
-          Text('Bantuan', style: AppTypography.labelMedium),
+          Text('Bantuan', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
           const SizedBox(height: 8),
           GlassCard(
             onTap: () async {
@@ -391,18 +533,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Text(
                         'Ulangi Tur Aplikasi',
-                        style: AppTypography.labelLarge,
+                        style: AppTypography.labelLarge.copyWith(color: colors.textPrimary),
                       ),
                       Text(
                         'Tampilkan panduan fitur aplikasi lagi',
-                        style: AppTypography.caption,
+                        style: AppTypography.caption.copyWith(color: colors.textMuted),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ],
             ),
@@ -431,13 +573,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'Aplikasi Pencatatan Keuangan Berbasis AI',
-                    style: AppTypography.caption,
+                    style: AppTypography.caption.copyWith(color: colors.textSecondary),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Versi 1.0.0 (Build 1)',
                     style: AppTypography.caption.copyWith(
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                     ),
                   ),
                 ],
@@ -508,13 +650,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       initialTime: _notificationTime,
       builder: (context, child) {
+        final isLight = AppColorScheme.isLight(context);
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.primary,
-              surface: AppColors.surface,
-              onSurface: AppColors.textPrimary,
-            ),
+            colorScheme: isLight
+                ? const ColorScheme.light(
+                    primary: AppColors.primary,
+                    surface: Colors.white,
+                    onSurface: Color(0xFF0F172A),
+                  )
+                : const ColorScheme.dark(
+                    primary: AppColors.primary,
+                    surface: AppColors.surface,
+                    onSurface: AppColors.textPrimary,
+                  ),
           ),
           child: child!,
         );

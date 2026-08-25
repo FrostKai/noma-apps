@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_color_scheme.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/glass_card.dart';
@@ -15,13 +16,14 @@ class ChatBubble extends StatelessWidget {
     required this.timestamp,
   });
 
-  Widget _buildFormattedText(String text) {
+  Widget _buildFormattedText(BuildContext context, String text) {
+    final colors = AppColorScheme.of(context);
     final spans = <InlineSpan>[];
     final regex = RegExp(r'\*\*(.*?)\*\*|\*(.*?)\*|`(.*?)`');
     int lastMatchEnd = 0;
 
     final baseStyle = AppTypography.bodyMedium.copyWith(
-      color: AppColors.textPrimary,
+      color: colors.textPrimary,
       height: 1.4,
     );
 
@@ -39,7 +41,7 @@ class ChatBubble extends StatelessWidget {
           text: match.group(1),
           style: baseStyle.copyWith(
             fontWeight: FontWeight.bold,
-            color: isUser ? AppColors.textPrimary : AppColors.primary,
+            color: isUser ? colors.textPrimary : AppColors.primary,
           ),
         ));
       } else if (match.group(2) != null) {
@@ -76,6 +78,7 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -104,10 +107,10 @@ class ChatBubble extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               borderRadius: 18,
               backgroundColor: isUser
-                  ? AppColors.surface.withValues(alpha: 0.8)
+                  ? colors.surface.withValues(alpha: 0.8)
                   : AppColors.primary.withValues(alpha: 0.15),
               borderColor: isUser
-                  ? AppColors.glassBorder
+                  ? colors.glassBorder
                   : AppColors.primary.withValues(alpha: 0.4),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -124,7 +127,7 @@ class ChatBubble extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  _buildFormattedText(message),
+                  _buildFormattedText(context, message),
                 ],
               ),
             ),
@@ -135,4 +138,3 @@ class ChatBubble extends StatelessWidget {
     );
   }
 }
-

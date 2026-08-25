@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/theme/glass_theme.dart';
 import 'bouncy_tap.dart';
 import 'liquid_wave_painter.dart';
@@ -11,8 +11,8 @@ class LiquidGlassCard extends StatefulWidget {
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final double borderRadius;
-  final Color backgroundColor;
-  final Color borderColor;
+  final Color? backgroundColor;
+  final Color? borderColor;
   final VoidCallback? onTap;
   final List<BoxShadow>? shadows;
   final double? width;
@@ -24,8 +24,8 @@ class LiquidGlassCard extends StatefulWidget {
     this.padding = const EdgeInsets.all(24),
     this.margin,
     this.borderRadius = GlassTheme.borderRadiusLarge,
-    this.backgroundColor = AppColors.glassCard,
-    this.borderColor = AppColors.glassBorder,
+    this.backgroundColor,
+    this.borderColor,
     this.onTap,
     this.shadows,
     this.width,
@@ -56,14 +56,20 @@ class _LiquidGlassCardState extends State<LiquidGlassCard> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
+    final isLight = AppColorScheme.isLight(context);
+    final bgColor = widget.backgroundColor ?? colors.glassCard;
+    final bdColor = widget.borderColor ?? colors.glassBorder;
+
     Widget cardContent = Container(
       width: widget.width,
       height: widget.height,
       decoration: GlassTheme.glassDecoration(
         borderRadius: widget.borderRadius,
-        surfaceColor: widget.backgroundColor,
-        borderColor: widget.borderColor,
+        surfaceColor: bgColor,
+        borderColor: bdColor,
         shadows: widget.shadows,
+        isLight: isLight,
       ),
       child: Stack(
         children: [

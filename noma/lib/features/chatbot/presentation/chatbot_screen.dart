@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/ai_key_setup_modal.dart';
@@ -79,6 +80,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
       }
     });
 
+    final colors = AppColorScheme.of(context);
     final messagesAsync = ref.watch(chatMessagesStreamProvider);
     final controllerState = ref.watch(chatbotControllerProvider);
     final mediaQuery = MediaQuery.of(context);
@@ -94,31 +96,31 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
               : 16.0 + mediaQuery.padding.bottom);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Row(
           children: [
             const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
             const SizedBox(width: 8),
-            Text('Nomi — Asisten AI', style: AppTypography.headingMedium),
+            Text('Nomi — Asisten AI', style: AppTypography.headingMedium.copyWith(color: colors.textPrimary)),
           ],
         ),
         automaticallyImplyLeading: !widget.isTabPage,
         leading: widget.isTabPage
             ? null
             : IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: AppColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
         actions: [
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.delete_sweep_rounded,
-              color: AppColors.textSecondary,
+              color: colors.textSecondary,
             ),
             tooltip: 'Hapus Obrolan',
             onPressed: () async {
@@ -179,16 +181,16 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                           const SizedBox(height: 16),
                           Text(
                             'Halo! Saya Nomi',
-                            style: AppTypography.headingLarge,
+                            style: AppTypography.headingLarge.copyWith(color: colors.textPrimary),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Tanyakan seputar saldo, pengeluaran, budgeting, dan tips hemat berdasarkan data Noma.\n(Riwayat chat dibersihkan otomatis setiap 24 jam)',
                             textAlign: TextAlign.center,
-                            style: AppTypography.caption,
+                            style: AppTypography.caption.copyWith(color: colors.textMuted),
                           ),
                           const SizedBox(height: 18),
-                          _buildQuickPrompts(),
+                          _buildQuickPrompts(context),
                         ],
                       ),
                     ),
@@ -223,7 +225,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
               loading: () => const Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              error: (err, _) => Center(child: Text('Error: $err', style: AppTypography.caption.copyWith(color: colors.textSecondary))),
             ),
           ),
 
@@ -260,13 +262,13 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                         size: 14,
                         color: AppColors.primary,
                       ),
-                      backgroundColor: AppColors.glassSurface,
+                      backgroundColor: colors.glassSurface,
                       side: BorderSide(
                         color: AppColors.primary.withValues(alpha: 0.3),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       labelStyle: AppTypography.caption.copyWith(
-                        color: AppColors.textPrimary,
+                        color: colors.textPrimary,
                         fontSize: 11,
                       ),
                       onPressed: () => _sendQuickPrompt(prompt),
@@ -289,13 +291,15 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             child: GlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               borderRadius: 28,
-              backgroundColor: AppColors.backgroundSecondary.withValues(
+              backgroundColor: colors.backgroundSecondary.withValues(
                 alpha: 0.9,
               ),
-              borderColor: AppColors.glassBorder,
+              borderColor: colors.glassBorder,
               shadows: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: AppColorScheme.isLight(context)
+                      ? Colors.black.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.3),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -312,16 +316,16 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      style: AppTypography.bodyMedium,
-                      decoration: const InputDecoration(
+                      style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary),
+                      decoration: InputDecoration(
                         hintText: 'Tanyakan seputar keuanganmu...',
                         hintStyle: TextStyle(
-                          color: AppColors.textMuted,
+                          color: colors.textMuted,
                           fontSize: 14,
                         ),
                         border: InputBorder.none,
                         isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
@@ -358,7 +362,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     );
   }
 
-  Widget _buildQuickPrompts() {
+  Widget _buildQuickPrompts(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     final prompts = [
       'Berapa saldo saya?',
       'Pengeluaran bulan ini',
@@ -374,10 +379,10 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
         return ActionChip(
           label: Text(prompt),
           avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
-          backgroundColor: AppColors.glassSurface,
+          backgroundColor: colors.glassSurface,
           side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
           labelStyle: AppTypography.caption.copyWith(
-            color: AppColors.textPrimary,
+            color: colors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
           onPressed: () => _sendQuickPrompt(prompt),

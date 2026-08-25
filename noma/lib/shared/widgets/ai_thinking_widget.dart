@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import 'glass_card.dart';
@@ -46,7 +47,7 @@ class _AiThinkingWidgetState extends State<AiThinkingWidget>
       return _buildCompactThinking();
     }
 
-    return _buildFullThinkingCard();
+    return _buildFullThinkingCard(context);
   }
 
   Widget _buildCompactThinking() {
@@ -74,7 +75,8 @@ class _AiThinkingWidgetState extends State<AiThinkingWidget>
     );
   }
 
-  Widget _buildFullThinkingCard() {
+  Widget _buildFullThinkingCard(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return GlassCard(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
       borderRadius: 24,
@@ -100,7 +102,7 @@ class _AiThinkingWidgetState extends State<AiThinkingWidget>
             widget.text,
             textAlign: TextAlign.center,
             style: AppTypography.labelLarge.copyWith(
-              color: AppColors.textPrimary,
+              color: colors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),

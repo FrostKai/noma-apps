@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/glass_theme.dart';
@@ -30,6 +31,7 @@ class GlassTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -37,7 +39,7 @@ class GlassTextField extends StatelessWidget {
           Text(
             labelText!,
             style: AppTypography.labelMedium.copyWith(
-              color: AppColors.textSecondary,
+              color: colors.textSecondary,
             ),
           ),
           const SizedBox(height: 6),
@@ -48,10 +50,10 @@ class GlassTextField extends StatelessWidget {
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.glassSurface,
+                color: colors.glassSurface,
                 borderRadius: BorderRadius.circular(GlassTheme.borderRadiusMedium),
                 border: Border.all(
-                  color: AppColors.glassBorder,
+                  color: colors.glassBorder,
                   width: 1.0,
                 ),
               ),
@@ -61,15 +63,17 @@ class GlassTextField extends StatelessWidget {
                 obscureText: obscureText,
                 onChanged: onChanged,
                 maxLines: maxLines,
-                style: AppTypography.bodyMedium,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: colors.textPrimary,
+                ),
                 cursorColor: AppColors.primary,
                 decoration: InputDecoration(
                   hintText: hintText,
                   hintStyle: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textMuted,
+                    color: colors.textMuted,
                   ),
                   prefixIcon: prefixIcon != null
-                      ? Icon(prefixIcon, color: AppColors.textSecondary, size: 20)
+                      ? Icon(prefixIcon, color: colors.textSecondary, size: 20)
                       : null,
                   suffixIcon: suffixIcon,
                   border: InputBorder.none,

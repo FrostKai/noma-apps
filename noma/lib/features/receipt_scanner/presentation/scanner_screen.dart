@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/services/api_key_service.dart';
@@ -13,6 +14,7 @@ import '../../../shared/widgets/ai_key_setup_modal.dart';
 import '../../../shared/widgets/ai_thinking_widget.dart';
 import '../../../shared/widgets/glass_button.dart';
 import '../../../shared/widgets/glass_card.dart';
+import '../../transaction/data/transaction_repository.dart';
 import '../../transaction/presentation/providers/transaction_provider.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
@@ -186,6 +188,124 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     return 0.0;
   }
 
+  double _parseQuantity(dynamic val) {
+    if (val == null) return 1.0;
+    if (val is num) return val.toDouble();
+    if (val is String) {
+      final cleaned = val
+          .replaceAll(',', '.')
+          .replaceAll(RegExp(r'[^0-9.]'), '');
+      return double.tryParse(cleaned) ?? 1.0;
+    }
+    return 1.0;
+  }
+
+  List<TransactionItemInput> _extractReceiptItems(List items) {
+    final parsedItems = <TransactionItemInput>[];
+
+    for (final rawItem in items) {
+      if (rawItem is! Map) continue;
+
+      final name = (rawItem['name'] ?? rawItem['nama'] ?? rawItem['item'] ?? '')
+          .toString()
+          .trim();
+      final totalPrice = _parseAmount(
+        rawItem['total_price'] ?? rawItem['price'] ?? rawItem['harga'],
+      );
+
+      if (name.isEmpty || totalPrice <= 0) continue;
+
+      final quantity = _parseQuantity(
+        rawItem['quantity'] ?? rawItem['qty'] ?? rawItem['jumlah'],
+      );
+      final unitPrice = _parseAmount(
+        rawItem['unit_price'] ??
+            rawItem['price_per_item'] ??
+            rawItem['harga_satuan'],
+      );
+
+      parsedItems.add((
+        name: name,
+        quantity: quantity <= 0 ? 1.0 : quantity,
+        unitPrice: unitPrice > 0 ? unitPrice : null,
+        totalPrice: totalPrice,
+      ));
+    }
+
+    return parsedItems;
+  }
+
+  Future<TransactionItemInput?> _showReceiptItemDialog(
+    BuildContext context, {
+    TransactionItemInput? initialItem,
+  }) async {
+    final nameController = TextEditingController(text: initialItem?.name ?? '');
+    final quantityController = TextEditingController(
+      text: initialItem == null ? '1' : initialItem.quantity.toString(),
+    );
+    final totalController = TextEditingController(
+      text: initialItem == null
+          ? ''
+          : initialItem.totalPrice.toInt().toString(),
+    );
+
+    final result = await showDialog<TransactionItemInput>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(initialItem == null ? 'Tambah Item' : 'Edit Item'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nama barang'),
+              ),
+              TextField(
+                controller: quantityController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Jumlah'),
+              ),
+              TextField(
+                controller: totalController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Total harga'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final quantity = _parseQuantity(quantityController.text);
+                final totalPrice = _parseAmount(totalController.text);
+
+                if (name.isEmpty || totalPrice <= 0) return;
+
+                Navigator.pop(context, (
+                  name: name,
+                  quantity: quantity <= 0 ? 1.0 : quantity,
+                  unitPrice: null,
+                  totalPrice: totalPrice,
+                ));
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+
+    nameController.dispose();
+    quantityController.dispose();
+    totalController.dispose();
+    return result;
+  }
+
   double _extractTotalAmount(Map<String, dynamic> result) {
     final items = (result['items'] as List?) ?? [];
 
@@ -216,6 +336,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   void _showConfirmationBottomSheet() {
     if (_scanResult == null) return;
+    final colors = AppColorScheme.of(context);
 
     final storeName =
         (_scanResult!['store_name'] as String?) ??
@@ -224,6 +345,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         'Struk Belanja';
 
     final items = (_scanResult!['items'] as List?) ?? [];
+    final receiptItems = _extractReceiptItems(items);
 
     final extractedTotal = _extractTotalAmount(_scanResult!);
 
@@ -234,194 +356,292 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.backgroundSecondary,
+      backgroundColor: colors.backgroundSecondary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (modalContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(modalContext).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.glassBorder,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalContext).viewInsets.bottom + 20,
               ),
-              const SizedBox(height: 16),
-              Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: AppColors.income,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Hasil Pemindaian Struk AI',
-                    style: AppTypography.headingSmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Summary Card (Clean static display as original)
-              GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Toko/Merchant', style: AppTypography.caption),
-                        Text(storeName, style: AppTypography.labelLarge),
-                      ],
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.glassBorder,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                    const Divider(color: AppColors.glassBorder),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.income,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Hasil Pemindaian Struk AI',
+                        style: AppTypography.headingSmall.copyWith(
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Summary Card (Clean static display as original)
+                  GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                       children: [
-                        Text('Total Belanja', style: AppTypography.caption),
-                        Text(
-                          CurrencyFormatter.formatRupiah(extractedTotal),
-                          style: AppTypography.amountLarge.copyWith(
-                            color: AppColors.expense,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Toko/Merchant',
+                              style: AppTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              storeName,
+                              style: AppTypography.labelLarge.copyWith(
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Divider(color: colors.glassBorder),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total Belanja',
+                              style: AppTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              CurrencyFormatter.formatRupiah(extractedTotal),
+                              style: AppTypography.amountLarge.copyWith(
+                                color: AppColors.expense,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Divider(color: colors.glassBorder),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Saran Kategori',
+                              style: AppTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            Chip(
+                              label: Text(
+                                category,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: 0.2,
+                              ),
+                              side: const BorderSide(color: AppColors.primary),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const Divider(color: AppColors.glassBorder),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Items breakdown if available
+                  if (receiptItems.isNotEmpty) ...[
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Saran Kategori', style: AppTypography.caption),
-                        Chip(
-                          label: Text(category, style: AppTypography.caption),
-                          backgroundColor: AppColors.primary.withValues(
-                            alpha: 0.2,
+                        Expanded(
+                          child: Text(
+                            'Rincian Item (${receiptItems.length}):',
+                            style: AppTypography.labelMedium.copyWith(
+                              color: colors.textSecondary,
+                            ),
                           ),
-                          side: const BorderSide(color: AppColors.primary),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Items breakdown if available
-              if (items.isNotEmpty) ...[
-                Text(
-                  'Rincian Item (${items.length}):',
-                  style: AppTypography.labelMedium,
-                ),
-                const SizedBox(height: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 130),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 6),
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      final name = (item['name'] as String?) ?? 'Item';
-                      final price = _parseAmount(
-                        item['total_price'] ?? item['price'] ?? item['harga'],
-                      );
-                      final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '$qty x $name',
-                              style: AppTypography.bodySmall,
-                            ),
-                          ),
-                          Text(
-                            CurrencyFormatter.formatRupiah(price),
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Action Buttons Row (Scan Ulang & Simpan Transaksi)
-              Row(
-                children: [
-                  Expanded(
-                    child: GlassButton(
-                      label: 'Scan Ulang',
-                      icon: Icons.refresh_rounded,
-                      variant: GlassButtonVariant.warning,
-                      height: 48,
-                      onPressed: () {
-                        Navigator.of(modalContext).pop();
-                        _processReceiptWithAi();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: GlassButton(
-                      label: 'Simpan Transaksi',
-                      icon: Icons.save_rounded,
-                      variant: GlassButtonVariant.income,
-                      height: 48,
-                      onPressed: () async {
-                        final navigator = Navigator.of(modalContext);
-                        final screenNavigator = Navigator.of(context);
-
-                        DateTime txDate = DateTime.now();
-                        if (dateStr.isNotEmpty) {
-                          try {
-                            txDate = DateTime.parse(dateStr);
-                          } catch (_) {}
-                        }
-
-                        final success = await ref
-                            .read(transactionControllerProvider.notifier)
-                            .addTransaction(
-                              type: 'expense',
-                              amount: extractedTotal,
-                              category: category,
-                              description: 'Struk $storeName',
-                              source: 'receipt_scan',
-                              paymentMethod: 'Tunai',
-                              receiptImagePath: kIsWeb ? null : _imagePath,
-                              transactionDate: txDate,
+                        TextButton.icon(
+                          onPressed: () async {
+                            final item = await _showReceiptItemDialog(
+                              modalContext,
                             );
-
-                        if (success) {
-                          navigator.pop();
-                          screenNavigator.pop();
-                        }
-                      },
+                            if (item != null) {
+                              setModalState(() => receiptItems.add(item));
+                            }
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text('Item'),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 150),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: receiptItems.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 6),
+                        itemBuilder: (context, index) {
+                          final item = receiptItems[index];
+
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} x ${item.name}',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                CurrencyFormatter.formatRupiah(item.totalPrice),
+                                style: AppTypography.caption.copyWith(
+                                  color: colors.textPrimary,
+                                ),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  Icons.edit_rounded,
+                                  size: 18,
+                                  color: colors.textSecondary,
+                                ),
+                                onPressed: () async {
+                                  final edited = await _showReceiptItemDialog(
+                                    modalContext,
+                                    initialItem: item,
+                                  );
+                                  if (edited != null) {
+                                    setModalState(
+                                      () => receiptItems[index] = edited,
+                                    );
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                  color: AppColors.expense,
+                                ),
+                                onPressed: () {
+                                  setModalState(
+                                    () => receiptItems.removeAt(index),
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ] else ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final item = await _showReceiptItemDialog(
+                            modalContext,
+                          );
+                          if (item != null) {
+                            setModalState(() => receiptItems.add(item));
+                          }
+                        },
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Tambah item struk'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Action Buttons Row (Scan Ulang & Simpan Transaksi)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GlassButton(
+                          label: 'Scan Ulang',
+                          icon: Icons.refresh_rounded,
+                          variant: GlassButtonVariant.warning,
+                          height: 48,
+                          onPressed: () {
+                            Navigator.of(modalContext).pop();
+                            _processReceiptWithAi();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: GlassButton(
+                          label: 'Simpan Transaksi',
+                          icon: Icons.save_rounded,
+                          variant: GlassButtonVariant.income,
+                          height: 48,
+                          onPressed: () async {
+                            final navigator = Navigator.of(modalContext);
+                            final screenNavigator = Navigator.of(context);
+
+                            DateTime txDate = DateTime.now();
+                            if (dateStr.isNotEmpty) {
+                              try {
+                                txDate = DateTime.parse(dateStr);
+                              } catch (_) {}
+                            }
+
+                            final success = await ref
+                                .read(transactionControllerProvider.notifier)
+                                .addTransaction(
+                                  type: 'expense',
+                                  amount: extractedTotal,
+                                  category: category,
+                                  description: 'Struk $storeName',
+                                  source: 'receipt_scan',
+                                  paymentMethod: 'Tunai',
+                                  receiptImagePath: kIsWeb ? null : _imagePath,
+                                  transactionDate: txDate,
+                                  items: receiptItems,
+                                );
+
+                            if (success) {
+                              navigator.pop();
+                              screenNavigator.pop();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -429,14 +649,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: Text('Pemindaian Struk AI', style: AppTypography.headingMedium),
+        title: Text(
+          'Pemindaian Struk AI',
+          style: AppTypography.headingMedium.copyWith(
+            color: colors.textPrimary,
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: AppColors.textPrimary,
+            color: colors.textPrimary,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -475,13 +701,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           const SizedBox(height: 16),
                           Text(
                             'Posisikan Struk Belanja di Dalam Kotak',
-                            style: AppTypography.labelLarge,
+                            style: AppTypography.labelLarge.copyWith(
+                              color: colors.textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             'Nomi AI akan mengekstrak toko, tanggal, & total secara otomatis',
                             textAlign: TextAlign.center,
-                            style: AppTypography.caption,
+                            style: AppTypography.caption.copyWith(
+                              color: colors.textMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -491,7 +721,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                     left: 14,
                     right: 14,
                     bottom: 14,
-                    child: _buildScanGuideOverlay(),
+                    child: _buildScanGuideOverlay(context),
                   ),
 
                   // Futuristic AI Scanning & Thinking Animation Overlay
@@ -513,7 +743,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             const SizedBox(height: 24),
 
             if (_lastScanError != null) ...[
-              _buildScanErrorCard(),
+              _buildScanErrorCard(context),
               const SizedBox(height: 16),
             ],
 
@@ -569,13 +799,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     );
   }
 
-  Widget _buildScanGuideOverlay() {
+  Widget _buildScanGuideOverlay(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.62),
+        color: AppColorScheme.isLight(context)
+            ? Colors.white.withValues(alpha: 0.85)
+            : Colors.black.withValues(alpha: 0.62),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: colors.glassBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,7 +823,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             child: Text(
               'Pastikan nama toko, daftar item, dan total belanja terlihat jelas.',
               style: AppTypography.caption.copyWith(
-                color: AppColors.textPrimary,
+                color: colors.textPrimary,
                 height: 1.35,
               ),
             ),
@@ -600,7 +833,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     );
   }
 
-  Widget _buildScanErrorCard() {
+  Widget _buildScanErrorCard(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return GlassCard(
       padding: const EdgeInsets.all(16),
       borderColor: AppColors.expense.withValues(alpha: 0.45),
@@ -618,7 +852,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               Text(
                 'Scan belum berhasil',
                 style: AppTypography.labelLarge.copyWith(
-                  color: AppColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
             ],
@@ -627,7 +861,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           Text(
             _lastScanError!,
             style: AppTypography.bodySmall.copyWith(
-              color: AppColors.textSecondary,
+              color: colors.textSecondary,
             ),
           ),
           const SizedBox(height: 12),

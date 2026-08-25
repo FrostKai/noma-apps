@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_images.dart';
 import '../../../core/constants/app_routes.dart';
@@ -14,12 +17,12 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../main_shell/presentation/main_shell_screen.dart';
 import '../../transaction/presentation/add_transaction_screen.dart';
 import '../../transaction/presentation/providers/transaction_provider.dart';
-import '../../transaction/presentation/widgets/ai_smart_input_card.dart';
 import '../../transaction/presentation/widgets/transaction_card.dart';
 
 import '../../../shared/widgets/animated_number_counter.dart';
 import '../../../shared/widgets/animated_slide_fade.dart';
 import '../../../shared/widgets/liquid_glass_card.dart';
+import '../../transaction/data/transaction_repository.dart';
 import 'widgets/dashboard_chart_card.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -32,13 +35,36 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   String _filterType = 'all'; // 'all', 'expense', 'income'
+  int _transactionLimit = defaultTransactionPageSize;
+  Timer? _searchDebounce;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final balanceAsync = ref.watch(totalBalanceStreamProvider);
     final incomeAsync = ref.watch(totalIncomeStreamProvider);
     final expenseAsync = ref.watch(totalExpenseStreamProvider);
-    final recentTxAsync = ref.watch(allTransactionsStreamProvider);
+    final txPageArgs = (
+      type: _filterType,
+      searchQuery: _searchQuery,
+      limit: _transactionLimit,
+      offset: 0,
+    );
+    final recentTxAsync = ref.watch(transactionsPageStreamProvider(txPageArgs));
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month);
+    final nextMonthStart = DateTime(now.year, now.month + 1);
+    final monthlySummaryAsync = ref.watch(
+      transactionSummaryStreamProvider((
+        startMs: monthStart.millisecondsSinceEpoch,
+        endMs: nextMonthStart.millisecondsSinceEpoch,
+      )),
+    );
 
     const tourTooltipBg = Color(0xE61A1A2E);
     const tourTitleStyle = TextStyle(
@@ -52,13 +78,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       height: 1.4,
     );
 
+    final colors = AppColorScheme.of(context);
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(recentTransactionsStreamProvider);
-            ref.invalidate(allTransactionsStreamProvider);
+            ref.invalidate(transactionsPageStreamProvider(txPageArgs));
+            ref.invalidate(
+              transactionSummaryStreamProvider((
+                startMs: monthStart.millisecondsSinceEpoch,
+                endMs: nextMonthStart.millisecondsSinceEpoch,
+              )),
+            );
             ref.invalidate(totalBalanceStreamProvider);
           },
           child: SingleChildScrollView(
@@ -105,33 +138,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // AI Natural Language Smart Input Card
+                // Monthly summary card
                 Showcase(
                   key: ProductTourKeys.aiSmartInput,
-                  title: 'Input AI Cerdas',
+                  title: 'Ringkasan Bulan Ini',
                   description:
-                      'Setelah API key aktif, ketik transaksi dengan bahasa alami!\nContoh: "Beli kopi 25rb".',
+                      'Lihat performa pemasukan dan pengeluaran bulan berjalan.',
                   targetBorderRadius: BorderRadius.circular(20),
                   targetPadding: const EdgeInsets.all(4),
                   tooltipBackgroundColor: tourTooltipBg,
                   titleTextStyle: tourTitleStyle,
                   descTextStyle: tourDescStyle,
-                  child: const AiSmartInputCard(),
-                ),
-                const SizedBox(height: 20),
-
-                // Quick Action Glass Chips
-                Showcase(
-                  key: ProductTourKeys.quickActions,
-                  title: 'Aksi Cepat',
-                  description:
-                      'Akses cepat ke fitur utama: Tambah, Scan Struk, Nomi AI, dan Laporan.',
-                  targetBorderRadius: BorderRadius.circular(16),
-                  targetPadding: const EdgeInsets.all(4),
-                  tooltipBackgroundColor: tourTooltipBg,
-                  titleTextStyle: tourTitleStyle,
-                  descTextStyle: tourDescStyle,
-                  child: _buildQuickActions(context),
+                  child: _buildMonthlySummaryCard(context, monthlySummaryAsync),
                 ),
                 const SizedBox(height: 28),
 
@@ -150,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   tooltipBackgroundColor: tourTooltipBg,
                   titleTextStyle: tourTitleStyle,
                   descTextStyle: tourDescStyle,
-                  child: _buildSearchAndFilterBar(),
+                  child: _buildSearchAndFilterBar(context),
                 ),
                 const SizedBox(height: 16),
 
@@ -182,9 +200,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTap: () {
             ref.read(activeTabProvider.notifier).state = 3;
           },
-          child: const Icon(
+          child: Icon(
             Icons.settings_outlined,
-            color: AppColors.textSecondary,
+            color: AppColorScheme.of(context).textSecondary,
             size: 22,
           ),
         ),
@@ -200,6 +218,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final balance = balanceAsync.valueOrNull ?? 0.0;
     final income = incomeAsync.valueOrNull ?? 0.0;
     final expense = expenseAsync.valueOrNull ?? 0.0;
+
+    final colors = AppColorScheme.of(context);
 
     return LiquidGlassCard(
       padding: const EdgeInsets.all(24),
@@ -222,7 +242,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Text(
                 'Total Saldo Bersih',
                 style: AppTypography.labelMedium.copyWith(
-                  color: AppColors.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               Container(
@@ -261,11 +281,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           AnimatedNumberCounter(
             targetAmount: balance,
             style: AppTypography.amountDisplay.copyWith(
-              color: balance >= 0 ? AppColors.textPrimary : AppColors.expense,
+              color: balance >= 0 ? colors.textPrimary : AppColors.expense,
             ),
           ),
           const SizedBox(height: 20),
-          const Divider(color: AppColors.glassBorder),
+          Divider(color: colors.glassBorder),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -301,7 +321,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              Container(width: 1, height: 32, color: AppColors.glassBorder),
+              Container(width: 1, height: 32, color: colors.glassBorder),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16),
@@ -344,77 +364,167 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
-    final actions = [
-      {
-        'title': 'Tambah',
-        'icon': Icons.add_circle_outline_rounded,
-        'color': AppColors.income,
-        'route': AppRoutes.addTransaction,
-      },
-      {
-        'title': 'Scan',
-        'icon': Icons.document_scanner_rounded,
-        'color': AppColors.primary,
-        'route': AppRoutes.scanner,
-      },
-      {
-        'title': 'Nomi AI',
-        'icon': Icons.chat_bubble_outline_rounded,
-        'color': AppColors.info,
-        'route': AppRoutes.chatbot,
-      },
-      {
-        'title': 'Laporan',
-        'icon': Icons.pie_chart_outline_rounded,
-        'color': AppColors.warning,
-        'route': AppRoutes.report,
-      },
-    ];
+  Widget _buildMonthlySummaryCard(
+    BuildContext context,
+    AsyncValue<TransactionSummary> summaryAsync,
+  ) {
+    final colors = AppColorScheme.of(context);
 
-    return Row(
-      children: actions.map((action) {
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: GlassCard(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-              borderRadius: 16,
-              onTap: () {
-                context.push(action['route'] as String);
-              },
-              child: Column(
+    return summaryAsync.when(
+      data: (summary) {
+        return GlassCard(
+          padding: const EdgeInsets.all(18),
+          borderRadius: 18,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: (action['color'] as Color).withValues(alpha: 0.2),
+                      color: AppColors.primary.withValues(alpha: 0.16),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      action['icon'] as IconData,
-                      color: action['color'] as Color,
-                      size: 22,
+                    child: const Icon(
+                      Icons.calendar_month_rounded,
+                      color: AppColors.primary,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ringkasan Bulan Ini',
+                          style: AppTypography.labelLarge.copyWith(
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          '${summary.count} transaksi tercatat',
+                          style: AppTypography.caption.copyWith(
+                            color: colors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   Text(
-                    action['title'] as String,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
+                    CurrencyFormatter.formatRupiahCompact(summary.balance),
+                    style: AppTypography.labelLarge.copyWith(
+                      color: summary.balance >= 0
+                          ? AppColors.income
+                          : AppColors.expense,
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMonthlyMetric(
+                      context,
+                      'Masuk',
+                      CurrencyFormatter.formatRupiahCompact(summary.income),
+                      AppColors.income,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildMonthlyMetric(
+                      context,
+                      'Keluar',
+                      CurrencyFormatter.formatRupiahCompact(summary.expense),
+                      AppColors.expense,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Divider(color: colors.glassBorder),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.local_offer_rounded,
+                    color: colors.textMuted,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      summary.topExpenseCategory == null
+                          ? 'Belum ada kategori pengeluaran bulan ini'
+                          : 'Kategori terbesar: ${summary.topExpenseCategory}',
+                      style: AppTypography.caption.copyWith(
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  if (summary.topExpenseCategory != null)
+                    Text(
+                      CurrencyFormatter.formatRupiahCompact(
+                        summary.topExpenseCategoryAmount,
+                      ),
+                      style: AppTypography.caption.copyWith(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ),
         );
-      }).toList(),
+      },
+      loading: () => const GlassCard(
+        padding: EdgeInsets.all(18),
+        child: LinearProgressIndicator(color: AppColors.primary),
+      ),
+      error: (err, _) => GlassCard(
+        padding: const EdgeInsets.all(18),
+        child: Text(
+          'Error memuat ringkasan: $err',
+          style: AppTypography.caption.copyWith(color: AppColors.expense),
+        ),
+      ),
     );
   }
 
-  Widget _buildSearchAndFilterBar() {
+  Widget _buildMonthlyMetric(
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
+    final colors = AppColorScheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(color: colors.textMuted),
+          ),
+          const SizedBox(height: 4),
+          Text(value, style: AppTypography.labelLarge.copyWith(color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilterBar(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     final filters = [
       {'key': 'all', 'label': 'Semua'},
       {'key': 'expense', 'label': 'Pengeluaran'},
@@ -426,34 +536,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // Search Input Field
         TextField(
           onChanged: (val) {
-            setState(() {
-              _searchQuery = val.trim().toLowerCase();
+            _searchDebounce?.cancel();
+            _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+              if (!mounted) return;
+              setState(() {
+                _searchQuery = val.trim().toLowerCase();
+                _transactionLimit = defaultTransactionPageSize;
+              });
             });
           },
-          style: AppTypography.bodyMedium,
+          style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary),
           decoration: InputDecoration(
             hintText: 'Cari transaksi (kategori, catatan, nominal)...',
-            hintStyle: AppTypography.caption.copyWith(
-              color: AppColors.textMuted,
-            ),
+            hintStyle: AppTypography.caption.copyWith(color: colors.textMuted),
             prefixIcon: const Icon(
               Icons.search_rounded,
               color: AppColors.primary,
               size: 20,
             ),
             filled: true,
-            fillColor: AppColors.glassSurface,
+            fillColor: colors.glassSurface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.glassBorder),
+              borderSide: BorderSide(color: colors.glassBorder),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.glassBorder),
+              borderSide: BorderSide(color: colors.glassBorder),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -473,18 +586,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 label: Text(f['label']!),
                 selected: isSelected,
                 selectedColor: AppColors.primary,
-                backgroundColor: AppColors.glassSurface,
+                backgroundColor: colors.glassSurface,
                 side: BorderSide(
-                  color: isSelected ? AppColors.primary : AppColors.glassBorder,
+                  color: isSelected ? AppColors.primary : colors.glassBorder,
                 ),
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                  color: isSelected ? Colors.white : colors.textSecondary,
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
                 onSelected: (_) {
                   setState(() {
                     _filterType = f['key']!;
+                    _transactionLimit = defaultTransactionPageSize;
                   });
                 },
               ),
@@ -502,18 +616,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ) {
     return recentTxAsync.when(
       data: (transactions) {
-        // Filter transactions by query & type
-        final filtered = transactions.where((tx) {
-          final matchesType = _filterType == 'all' || tx.type == _filterType;
-          final query = _searchQuery.toLowerCase();
-          final matchesQuery =
-              query.isEmpty ||
-              tx.category.toLowerCase().contains(query) ||
-              (tx.description?.toLowerCase().contains(query) ?? false) ||
-              (tx.paymentMethod?.toLowerCase().contains(query) ?? false) ||
-              tx.amount.toInt().toString().contains(query);
-          return matchesType && matchesQuery;
-        }).toList();
+        final filtered = transactions;
 
         if (filtered.isEmpty) {
           return GlassCard(
@@ -540,7 +643,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ? 'Transaksi tidak ditemukan'
                         : 'Belum ada transaksi',
                     style: AppTypography.headingSmall.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColorScheme.of(context).textSecondary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -585,55 +688,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
 
         return Column(
-          children: filtered.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final tx = entry.value;
+          children: [
+            ...filtered.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final tx = entry.value;
 
-            return AnimatedSlideFade(
-              index: idx,
-              child: TransactionCard(
-                transaction: tx,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          AddTransactionScreen(initialTransaction: tx),
-                    ),
-                  );
-                },
-                onDelete: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Hapus Transaksi?'),
-                      content: Text(
-                        'Yakin ingin menghapus transaksi ${tx.category} senilai ${CurrencyFormatter.formatRupiah(tx.amount)}?',
+              return AnimatedSlideFade(
+                index: idx,
+                child: TransactionCard(
+                  transaction: tx,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AddTransactionScreen(initialTransaction: tx),
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Batal'),
+                    );
+                  },
+                  onDelete: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Hapus Transaksi?'),
+                        content: Text(
+                          'Yakin ingin menghapus transaksi ${tx.category} senilai ${CurrencyFormatter.formatRupiah(tx.amount)}?',
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text(
-                            'Hapus',
-                            style: TextStyle(color: AppColors.expense),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Batal'),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              'Hapus',
+                              style: TextStyle(color: AppColors.expense),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
 
-                  if (confirm == true) {
-                    ref
-                        .read(transactionControllerProvider.notifier)
-                        .deleteTransaction(tx.id);
-                  }
+                    if (confirm == true) {
+                      ref
+                          .read(transactionControllerProvider.notifier)
+                          .deleteTransaction(tx.id);
+                    }
+                  },
+                ),
+              );
+            }),
+            if (filtered.length == _transactionLimit) ...[
+              const SizedBox(height: 12),
+              GlassButton(
+                label: 'Muat Lagi',
+                icon: Icons.expand_more_rounded,
+                variant: GlassButtonVariant.secondary,
+                height: 44,
+                onPressed: () {
+                  setState(() {
+                    _transactionLimit += defaultTransactionPageSize;
+                  });
                 },
               ),
-            );
-          }).toList(),
+            ],
+          ],
         );
       },
       loading: () => const Padding(

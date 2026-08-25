@@ -670,6 +670,397 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   }
 }
 
+class $TransactionItemsTable extends TransactionItems
+    with TableInfo<$TransactionItemsTable, TransactionItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransactionItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _transactionIdMeta = const VerificationMeta(
+    'transactionId',
+  );
+  @override
+  late final GeneratedColumn<int> transactionId = GeneratedColumn<int>(
+    'transaction_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES transactions (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1.0),
+  );
+  static const VerificationMeta _unitPriceMeta = const VerificationMeta(
+    'unitPrice',
+  );
+  @override
+  late final GeneratedColumn<double> unitPrice = GeneratedColumn<double>(
+    'unit_price',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _totalPriceMeta = const VerificationMeta(
+    'totalPrice',
+  );
+  @override
+  late final GeneratedColumn<double> totalPrice = GeneratedColumn<double>(
+    'total_price',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    transactionId,
+    name,
+    quantity,
+    unitPrice,
+    totalPrice,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transaction_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransactionItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('transaction_id')) {
+      context.handle(
+        _transactionIdMeta,
+        transactionId.isAcceptableOrUnknown(
+          data['transaction_id']!,
+          _transactionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_transactionIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    if (data.containsKey('unit_price')) {
+      context.handle(
+        _unitPriceMeta,
+        unitPrice.isAcceptableOrUnknown(data['unit_price']!, _unitPriceMeta),
+      );
+    }
+    if (data.containsKey('total_price')) {
+      context.handle(
+        _totalPriceMeta,
+        totalPrice.isAcceptableOrUnknown(data['total_price']!, _totalPriceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_totalPriceMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TransactionItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransactionItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      transactionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transaction_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      )!,
+      unitPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}unit_price'],
+      ),
+      totalPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}total_price'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TransactionItemsTable createAlias(String alias) {
+    return $TransactionItemsTable(attachedDatabase, alias);
+  }
+}
+
+class TransactionItem extends DataClass implements Insertable<TransactionItem> {
+  final int id;
+  final int transactionId;
+  final String name;
+  final double quantity;
+  final double? unitPrice;
+  final double totalPrice;
+  final int createdAt;
+  const TransactionItem({
+    required this.id,
+    required this.transactionId,
+    required this.name,
+    required this.quantity,
+    this.unitPrice,
+    required this.totalPrice,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['transaction_id'] = Variable<int>(transactionId);
+    map['name'] = Variable<String>(name);
+    map['quantity'] = Variable<double>(quantity);
+    if (!nullToAbsent || unitPrice != null) {
+      map['unit_price'] = Variable<double>(unitPrice);
+    }
+    map['total_price'] = Variable<double>(totalPrice);
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  TransactionItemsCompanion toCompanion(bool nullToAbsent) {
+    return TransactionItemsCompanion(
+      id: Value(id),
+      transactionId: Value(transactionId),
+      name: Value(name),
+      quantity: Value(quantity),
+      unitPrice: unitPrice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitPrice),
+      totalPrice: Value(totalPrice),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TransactionItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransactionItem(
+      id: serializer.fromJson<int>(json['id']),
+      transactionId: serializer.fromJson<int>(json['transactionId']),
+      name: serializer.fromJson<String>(json['name']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      unitPrice: serializer.fromJson<double?>(json['unitPrice']),
+      totalPrice: serializer.fromJson<double>(json['totalPrice']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'transactionId': serializer.toJson<int>(transactionId),
+      'name': serializer.toJson<String>(name),
+      'quantity': serializer.toJson<double>(quantity),
+      'unitPrice': serializer.toJson<double?>(unitPrice),
+      'totalPrice': serializer.toJson<double>(totalPrice),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  TransactionItem copyWith({
+    int? id,
+    int? transactionId,
+    String? name,
+    double? quantity,
+    Value<double?> unitPrice = const Value.absent(),
+    double? totalPrice,
+    int? createdAt,
+  }) => TransactionItem(
+    id: id ?? this.id,
+    transactionId: transactionId ?? this.transactionId,
+    name: name ?? this.name,
+    quantity: quantity ?? this.quantity,
+    unitPrice: unitPrice.present ? unitPrice.value : this.unitPrice,
+    totalPrice: totalPrice ?? this.totalPrice,
+    createdAt: createdAt ?? this.createdAt,
+  );
+
+  @override
+  String toString() {
+    return (StringBuffer('TransactionItem(')
+          ..write('id: $id, ')
+          ..write('transactionId: $transactionId, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitPrice: $unitPrice, ')
+          ..write('totalPrice: $totalPrice, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
+  final Value<int> id;
+  final Value<int> transactionId;
+  final Value<String> name;
+  final Value<double> quantity;
+  final Value<double?> unitPrice;
+  final Value<double> totalPrice;
+  final Value<int> createdAt;
+  const TransactionItemsCompanion({
+    this.id = const Value.absent(),
+    this.transactionId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unitPrice = const Value.absent(),
+    this.totalPrice = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  TransactionItemsCompanion.insert({
+    this.id = const Value.absent(),
+    required int transactionId,
+    required String name,
+    this.quantity = const Value.absent(),
+    this.unitPrice = const Value.absent(),
+    required double totalPrice,
+    required int createdAt,
+  }) : transactionId = Value(transactionId),
+       name = Value(name),
+       totalPrice = Value(totalPrice),
+       createdAt = Value(createdAt);
+  static Insertable<TransactionItem> custom({
+    Expression<int>? id,
+    Expression<int>? transactionId,
+    Expression<String>? name,
+    Expression<double>? quantity,
+    Expression<double>? unitPrice,
+    Expression<double>? totalPrice,
+    Expression<int>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (transactionId != null) 'transaction_id': transactionId,
+      if (name != null) 'name': name,
+      if (quantity != null) 'quantity': quantity,
+      if (unitPrice != null) 'unit_price': unitPrice,
+      if (totalPrice != null) 'total_price': totalPrice,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (transactionId.present) {
+      map['transaction_id'] = Variable<int>(transactionId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unitPrice.present) {
+      map['unit_price'] = Variable<double>(unitPrice.value);
+    }
+    if (totalPrice.present) {
+      map['total_price'] = Variable<double>(totalPrice.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    return map;
+  }
+}
+
 class $CategoriesTable extends Categories
     with TableInfo<$CategoriesTable, Category> {
   @override
@@ -1630,6 +2021,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
+  late final $TransactionItemsTable transactionItems = $TransactionItemsTable(
+    this,
+  );
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $ChatMessagesTable chatMessages = $ChatMessagesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
@@ -1639,6 +2033,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     transactions,
+    transactionItems,
     categories,
     chatMessages,
     appSettings,

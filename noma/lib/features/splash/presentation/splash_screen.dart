@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_images.dart';
@@ -93,8 +94,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       body: Stack(
         alignment: Alignment.center,
         children: [
@@ -143,7 +145,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             return GlassCard(
                               padding: const EdgeInsets.all(22),
                               borderRadius: 32,
-                              backgroundColor: AppColors.backgroundSecondary.withValues(alpha: 0.85),
+                              backgroundColor: colors.backgroundSecondary.withValues(alpha: 0.85),
                               borderColor: AppColors.primary.withValues(alpha: 0.6),
                               shadows: [
                                 BoxShadow(
@@ -188,7 +190,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               AppConstants.appName,
                               style: AppTypography.amountDisplay.copyWith(
                                 fontSize: 38,
-                                color: AppColors.textPrimary,
+                                color: colors.textPrimary,
                                 letterSpacing: 2,
                               ),
                             ),
@@ -206,7 +208,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             child: Text(
                               AppConstants.appTagline,
                               style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
+                                color: colors.textSecondary,
                                 letterSpacing: 1.0,
                                 fontWeight: FontWeight.w500,
                               ),

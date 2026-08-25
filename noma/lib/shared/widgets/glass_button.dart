@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/glass_theme.dart';
@@ -26,7 +27,8 @@ class GlassButton extends StatelessWidget {
     this.height = 52.0,
   });
 
-  Color get _accentColor {
+  Color _accentColor(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     switch (variant) {
       case GlassButtonVariant.primary:
         return AppColors.primary;
@@ -38,19 +40,21 @@ class GlassButton extends StatelessWidget {
         return AppColors.warning;
       case GlassButtonVariant.secondary:
       case GlassButtonVariant.outline:
-        return AppColors.textPrimary;
+        return colors.textPrimary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    Color bg = _accentColor.withValues(alpha: 0.2);
-    Color border = _accentColor.withValues(alpha: 0.4);
-    Color textColor = AppColors.textPrimary;
+    final colors = AppColorScheme.of(context);
+    final accent = _accentColor(context);
+    Color bg = accent.withValues(alpha: 0.2);
+    Color border = accent.withValues(alpha: 0.4);
+    Color textColor = colors.textPrimary;
 
     if (variant == GlassButtonVariant.outline) {
       bg = Colors.transparent;
-      border = AppColors.glassBorder;
+      border = colors.glassBorder;
     }
 
     return ClipRRect(
@@ -66,7 +70,7 @@ class GlassButton extends StatelessWidget {
             border: Border.all(color: border, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: _accentColor.withValues(alpha: 0.25),
+                color: accent.withValues(alpha: 0.25),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),

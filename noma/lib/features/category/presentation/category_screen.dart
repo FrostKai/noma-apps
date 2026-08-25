@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/providers/database_provider.dart';
@@ -21,11 +22,12 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
     String categoryType = 'expense';
+    final colors = AppColorScheme.of(context);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.backgroundSecondary,
+      backgroundColor: colors.backgroundSecondary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -48,13 +50,13 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.glassBorder,
+                        color: colors.glassBorder,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Tambah Kategori Baru', style: AppTypography.headingMedium),
+                  Text('Tambah Kategori Baru', style: AppTypography.headingMedium.copyWith(color: colors.textPrimary)),
                   const SizedBox(height: 16),
 
                   // Category Type Selector
@@ -126,14 +128,15 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     final categoriesAsync = ref.watch(categoriesStreamProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: Text('Manajemen Kategori', style: AppTypography.headingMedium),
+        title: Text('Manajemen Kategori', style: AppTypography.headingMedium.copyWith(color: colors.textPrimary)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: colors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -144,11 +147,11 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
-                _buildFilterChip('Semua', 'all'),
+                _buildFilterChip(context, 'Semua', 'all'),
                 const SizedBox(width: 8),
-                _buildFilterChip('Pengeluaran', 'expense'),
+                _buildFilterChip(context, 'Pengeluaran', 'expense'),
                 const SizedBox(width: 8),
-                _buildFilterChip('Pemasukan', 'income'),
+                _buildFilterChip(context, 'Pemasukan', 'income'),
               ],
             ),
           ),
@@ -166,7 +169,7 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                   return Center(
                     child: Text(
                       'Tidak ada kategori ditemukan',
-                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.bodyMedium.copyWith(color: colors.textSecondary),
                     ),
                   );
                 }
@@ -209,11 +212,11 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(cat.name, style: AppTypography.labelLarge),
+                                Text(cat.name, style: AppTypography.labelLarge.copyWith(color: colors.textPrimary)),
                                 const SizedBox(height: 2),
                                 Text(
                                   isIncome ? 'Pemasukan' : 'Pengeluaran',
-                                  style: AppTypography.caption,
+                                  style: AppTypography.caption.copyWith(color: colors.textMuted),
                                 ),
                               ],
                             ),
@@ -222,11 +225,11 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: AppColors.glassSurface,
+                                color: colors.glassSurface,
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.glassBorder),
+                                border: Border.all(color: colors.glassBorder),
                               ),
-                              child: Text('Default', style: AppTypography.caption),
+                              child: Text('Default', style: AppTypography.caption.copyWith(color: colors.textMuted)),
                             )
                           else
                             IconButton(
@@ -261,7 +264,7 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              error: (err, _) => Center(child: Text('Error: $err', style: AppTypography.caption.copyWith(color: colors.textSecondary))),
             ),
           ),
         ],
@@ -275,18 +278,19 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
+  Widget _buildFilterChip(BuildContext context, String label, String value) {
+    final colors = AppColorScheme.of(context);
     final isSelected = _filterType == value;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
       selectedColor: AppColors.primary,
-      backgroundColor: AppColors.glassSurface,
+      backgroundColor: colors.glassSurface,
       side: BorderSide(
-        color: isSelected ? Colors.transparent : AppColors.glassBorder,
+        color: isSelected ? Colors.transparent : colors.glassBorder,
       ),
       labelStyle: AppTypography.caption.copyWith(
-        color: isSelected ? Colors.white : AppColors.textPrimary,
+        color: isSelected ? Colors.white : colors.textPrimary,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
       onSelected: (selected) {

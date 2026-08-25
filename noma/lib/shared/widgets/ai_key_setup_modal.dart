@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/product_tour_keys.dart';
 import '../../core/services/api_key_service.dart';
@@ -321,6 +322,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     final screenHeight = MediaQuery.of(context).size.height;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final maxModalHeight = (screenHeight - bottomInset) * 0.88;
@@ -379,12 +381,14 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                       bottom: 20,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.backgroundSecondary.withValues(alpha: 0.98),
+                      color: colors.backgroundSecondary.withValues(alpha: 0.98),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                      border: Border.all(color: AppColors.glassBorder, width: 1.5),
+                      border: Border.all(color: colors.glassBorder, width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.25),
+                          color: AppColorScheme.isLight(context)
+                              ? Colors.black.withValues(alpha: 0.1)
+                              : AppColors.primary.withValues(alpha: 0.25),
                           blurRadius: 35,
                           spreadRadius: 5,
                         ),
@@ -403,7 +407,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                               height: 5,
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: AppColors.textMuted.withValues(alpha: 0.6),
+                                color: colors.textMuted.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(2.5),
                               ),
                             ),
@@ -466,11 +470,11 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Pengaturan API Key AI', style: AppTypography.headingSmall),
-                                    Text(
-                                      'Input Kunci Groq & Gemini Terpisah',
-                                      style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                                    ),
+                                     Text('Pengaturan API Key AI', style: AppTypography.headingSmall.copyWith(color: colors.textPrimary)),
+                                     Text(
+                                       'Input Kunci Groq & Gemini Terpisah',
+                                       style: AppTypography.caption.copyWith(color: colors.textSecondary),
+                                     ),
                                   ],
                                 ),
                               ),
@@ -615,29 +619,29 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                         child: TextField(
                                           controller: _groqController,
                                           obscureText: _obscureGroq,
-                                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                                          style: TextStyle(color: colors.textPrimary, fontSize: 13),
                                           onChanged: (val) {
                                             if (_isGroqSaved) setState(() => _isGroqSaved = false);
                                           },
                                           decoration: InputDecoration(
                                             hintText: 'gsk_...',
-                                            hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
+                                            hintStyle: TextStyle(color: colors.textMuted.withValues(alpha: 0.5)),
                                             filled: true,
-                                            fillColor: AppColors.background,
+                                            fillColor: colors.background,
                                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                             suffixIcon: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 if (_groqController.text.isNotEmpty)
                                                   IconButton(
-                                                    icon: const Icon(Icons.clear_rounded, size: 16, color: AppColors.textMuted),
+                                                    icon: Icon(Icons.clear_rounded, size: 16, color: colors.textMuted),
                                                     onPressed: _clearGroqKey,
                                                   ),
                                                 IconButton(
                                                   icon: Icon(
                                                     _obscureGroq ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                                                     size: 18,
-                                                    color: AppColors.textSecondary,
+                                                    color: colors.textSecondary,
                                                   ),
                                                   onPressed: () => setState(() => _obscureGroq = !_obscureGroq),
                                                 ),
@@ -645,7 +649,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                             ),
                                             border: OutlineInputBorder(
                                               borderRadius: BorderRadius.circular(12),
-                                              borderSide: const BorderSide(color: AppColors.glassBorder),
+                                              borderSide: BorderSide(color: colors.glassBorder),
                                             ),
                                             focusedBorder: OutlineInputBorder(
                                               borderRadius: BorderRadius.circular(12),
@@ -758,29 +762,29 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                         child: TextField(
                                           controller: _geminiController,
                                           obscureText: _obscureGemini,
-                                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                                          style: TextStyle(color: colors.textPrimary, fontSize: 13),
                                           onChanged: (val) {
                                             if (_isGeminiSaved) setState(() => _isGeminiSaved = false);
                                           },
                                           decoration: InputDecoration(
                                             hintText: 'AIzaSy... atau AQ....',
-                                            hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
+                                            hintStyle: TextStyle(color: colors.textMuted.withValues(alpha: 0.5)),
                                             filled: true,
-                                            fillColor: AppColors.background,
+                                            fillColor: colors.background,
                                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                             suffixIcon: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 if (_geminiController.text.isNotEmpty)
                                                   IconButton(
-                                                    icon: const Icon(Icons.clear_rounded, size: 16, color: AppColors.textMuted),
+                                                    icon: Icon(Icons.clear_rounded, size: 16, color: colors.textMuted),
                                                     onPressed: _clearGeminiKey,
                                                   ),
                                                 IconButton(
                                                   icon: Icon(
                                                     _obscureGemini ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                                                     size: 18,
-                                                    color: AppColors.textSecondary,
+                                                    color: colors.textSecondary,
                                                   ),
                                                   onPressed: () => setState(() => _obscureGemini = !_obscureGemini),
                                                 ),
@@ -788,7 +792,7 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                             ),
                                             border: OutlineInputBorder(
                                               borderRadius: BorderRadius.circular(12),
-                                              borderSide: const BorderSide(color: AppColors.glassBorder),
+                                              borderSide: BorderSide(color: colors.glassBorder),
                                             ),
                                             focusedBorder: OutlineInputBorder(
                                               borderRadius: BorderRadius.circular(12),

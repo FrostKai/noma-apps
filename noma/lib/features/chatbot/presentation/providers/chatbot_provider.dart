@@ -11,18 +11,20 @@ final chatbotRepositoryProvider = Provider<IChatbotRepository>((ref) {
   return ChatbotRepository(db);
 });
 
-final chatMessagesStreamProvider = StreamProvider.autoDispose<List<ChatMessage>>((ref) {
-  final repo = ref.watch(chatbotRepositoryProvider);
-  return repo.watchChatMessages();
-});
+final chatMessagesStreamProvider =
+    StreamProvider.autoDispose<List<ChatMessage>>((ref) {
+      final repo = ref.watch(chatbotRepositoryProvider);
+      return repo.watchChatMessages();
+    });
 
-final chatbotControllerProvider = StateNotifierProvider<ChatbotController, AsyncValue<void>>((ref) {
-  return ChatbotController(
-    ref.watch(chatbotRepositoryProvider),
-    ref.watch(geminiApiServiceProvider),
-    ref,
-  );
-});
+final chatbotControllerProvider =
+    StateNotifierProvider<ChatbotController, AsyncValue<void>>((ref) {
+      return ChatbotController(
+        ref.watch(chatbotRepositoryProvider),
+        ref.watch(geminiApiServiceProvider),
+        ref,
+      );
+    });
 
 class ChatbotController extends StateNotifier<AsyncValue<void>> {
   final IChatbotRepository _repo;
@@ -49,10 +51,7 @@ class ChatbotController extends StateNotifier<AsyncValue<void>> {
       final financialContext = await _buildRichFinancialContext();
 
       final historyPayload = historyBeforeInsert.map((msg) {
-        return {
-          'role': msg.role,
-          'content': msg.content,
-        };
+        return {'role': msg.role, 'content': msg.content};
       }).toList();
 
       final aiService = _ref.read(geminiApiServiceProvider);
@@ -78,65 +77,72 @@ class ChatbotController extends StateNotifier<AsyncValue<void>> {
 
   Future<String> _buildRichFinancialContext() async {
     final db = _ref.read(databaseProvider);
-    final allTxs = await (db.select(db.transactions)
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.transactionDate, mode: OrderingMode.desc),
-            (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
-          ]))
-        .get();
-
-    double totalIncome = 0;
-    double totalExpense = 0;
-    double thisMonthIncome = 0;
-    double thisMonthExpense = 0;
 
     final now = DateTime.now();
-    final Map<String, double> categoryExpenses = {};
-
-    for (final tx in allTxs) {
-      final txDate = DateTime.fromMillisecondsSinceEpoch(tx.transactionDate);
-      final isThisMonth = txDate.year == now.year && txDate.month == now.month;
-
-      if (tx.type == 'income') {
-        totalIncome += tx.amount;
-        if (isThisMonth) thisMonthIncome += tx.amount;
-      } else {
-        totalExpense += tx.amount;
-        if (isThisMonth) thisMonthExpense += tx.amount;
-        categoryExpenses[tx.category] = (categoryExpenses[tx.category] ?? 0) + tx.amount;
-      }
-    }
-
+    final monthStart = DateTime(now.year, now.month).millisecondsSinceEpoch;
+    final nextMonthStart = DateTime(
+      now.year,
+      now.month + 1,
+    ).millisecondsSinceEpoch;
+    final totalIncome = await _sumTransactions(db, type: 'income');
+    final totalExpense = await _sumTransactions(db, type: 'expense');
+    final thisMonthIncome = await _sumTransactions(
+      db,
+      type: 'income',
+      startMs: monthStart,
+      endMs: nextMonthStart,
+    );
+    final thisMonthExpense = await _sumTransactions(
+      db,
+      type: 'expense',
+      startMs: monthStart,
+      endMs: nextMonthStart,
+    );
+    final sortedCategories = await _topExpenseCategories(db, limit: 5);
+    final recentTransactions = await _recentTransactions(db, limit: 5);
     final balance = totalIncome - totalExpense;
-
-    final sortedCategories = categoryExpenses.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
 
     final catBuffer = StringBuffer();
     if (sortedCategories.isEmpty) {
       catBuffer.writeln('- Belum ada pengeluaran per kategori.');
     } else {
-      for (final entry in sortedCategories.take(5)) {
-        catBuffer.writeln('- ${entry.key}: ${CurrencyFormatter.formatRupiah(entry.value)}');
+      for (final entry in sortedCategories) {
+        catBuffer.writeln(
+          '- ${entry.key}: ${CurrencyFormatter.formatRupiah(entry.value)}',
+        );
       }
     }
 
     final recentBuffer = StringBuffer();
-    if (allTxs.isEmpty) {
+    if (recentTransactions.isEmpty) {
       recentBuffer.writeln('- Belum ada catatan transaksi.');
     } else {
-      for (final tx in allTxs.take(5)) {
+      for (final tx in recentTransactions) {
         final d = DateTime.fromMillisecondsSinceEpoch(tx.transactionDate);
         final dateStr = '${d.day}/${d.month}/${d.year}';
         final typeLabel = tx.type == 'income' ? 'Pemasukan' : 'Pengeluaran';
-        final desc = tx.description != null && tx.description!.isNotEmpty ? ' (${tx.description})' : '';
-        recentBuffer.writeln('- $dateStr | $typeLabel | ${tx.category} | ${CurrencyFormatter.formatRupiah(tx.amount)}$desc');
+        final desc = tx.description != null && tx.description!.isNotEmpty
+            ? ' (${tx.description})'
+            : '';
+        recentBuffer.writeln(
+          '- $dateStr | $typeLabel | ${tx.category} | ${CurrencyFormatter.formatRupiah(tx.amount)}$desc',
+        );
       }
     }
 
     final monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     final currentMonthName = monthNames[now.month - 1];
 
@@ -158,8 +164,81 @@ ${recentBuffer.toString().trim()}
 ''';
   }
 
+  Future<double> _sumTransactions(
+    AppDatabase db, {
+    required String type,
+    int? startMs,
+    int? endMs,
+  }) async {
+    final sumAmount = db.transactions.amount.sum();
+    final query = db.selectOnly(db.transactions)
+      ..addColumns([sumAmount])
+      ..where(
+        _transactionPredicate(db, type: type, startMs: startMs, endMs: endMs),
+      );
+
+    final row = await query.getSingleOrNull();
+    return row?.read(sumAmount) ?? 0.0;
+  }
+
+  Future<List<MapEntry<String, double>>> _topExpenseCategories(
+    AppDatabase db, {
+    required int limit,
+  }) async {
+    final sumAmount = db.transactions.amount.sum();
+    final category = db.transactions.category;
+    final query = db.selectOnly(db.transactions)
+      ..addColumns([category, sumAmount])
+      ..where(_transactionPredicate(db, type: 'expense'))
+      ..groupBy([category])
+      ..orderBy([OrderingTerm.desc(sumAmount)])
+      ..limit(limit);
+
+    final rows = await query.get();
+    return rows
+        .map(
+          (row) =>
+              MapEntry(row.read(category) ?? '-', row.read(sumAmount) ?? 0.0),
+        )
+        .toList();
+  }
+
+  Future<List<Transaction>> _recentTransactions(
+    AppDatabase db, {
+    required int limit,
+  }) {
+    return (db.select(db.transactions)
+          ..orderBy([
+            (t) => OrderingTerm(
+              expression: t.transactionDate,
+              mode: OrderingMode.desc,
+            ),
+            (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+          ])
+          ..limit(limit))
+        .get();
+  }
+
+  Expression<bool> _transactionPredicate(
+    AppDatabase db, {
+    required String type,
+    int? startMs,
+    int? endMs,
+  }) {
+    Expression<bool> predicate = db.transactions.type.equals(type);
+    if (startMs != null) {
+      predicate =
+          predicate &
+          db.transactions.transactionDate.isBiggerOrEqualValue(startMs);
+    }
+    if (endMs != null) {
+      predicate =
+          predicate & db.transactions.transactionDate.isSmallerThanValue(endMs);
+    }
+    return predicate;
+  }
+
   Future<void> clearHistory() async {
     await _repo.clearHistory();
   }
 }
-

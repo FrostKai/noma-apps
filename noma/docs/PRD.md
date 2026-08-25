@@ -1,116 +1,364 @@
 # Product Requirements Document (PRD) - Noma
 
-## Status Implementasi Saat Ini - 7 Agustus 2026
+## Status Implementasi Saat Ini - 25 Agustus 2026
 
-Dokumen ini tetap menjadi rujukan produk, tetapi kondisi kode saat ini sudah melewati scaffold awal dan berada pada fase MVP fungsional. Implementasi yang sudah tersedia:
+Noma sudah berada pada fase MVP fungsional. Aplikasi utama sudah berjalan dengan pencatatan transaksi, scan struk, detail item barang, dashboard, laporan, chatbot AI, database lokal offline, dan optimasi performa untuk histori besar.
 
-- Pencatatan transaksi manual: tambah, edit, hapus, tanggal, kategori, metode pembayaran.
-- Dashboard: saldo bersih, total pemasukan, total pengeluaran, grafik ringkas, pencarian, dan filter jenis transaksi.
-- Kategori: daftar kategori default, tambah kategori kustom, hapus kategori kustom.
-- AI text input: parsing teks natural memakai Cloud AI atau fallback rule-based lokal, lalu membuka layar konfirmasi transaksi.
-- Receipt scanner: ambil gambar kamera/galeri, kirim ke Gemini Vision, tampilkan hasil ekstraksi, lalu simpan sebagai pengeluaran.
-- Chatbot Nomi AI: riwayat chat lokal, konteks saldo/pemasukan/pengeluaran, fallback lokal saat AI gagal.
-- Laporan: filter periode sederhana, bar chart pemasukan vs pengeluaran, donut chart pengeluaran per kategori.
-- Pengaturan: API key Groq/Gemini, notifikasi harian lokal, manajemen kategori.
+Status teknis terakhir:
 
-Gap produk yang masih perlu diselesaikan:
+- `flutter analyze`: PASS, no issues found.
+- `flutter test`: PASS.
+- Perf smoke SQLite in-memory tersedia di `tool/perf_smoke.dart`.
+- Target 100.000 transaksi sudah diuji lewat query smoke tanpa memuat seluruh histori ke memory.
 
-- Review hasil AI text saat ini memakai mode edit transaksi dengan `id: 0`; secara teknis ini perlu diperbaiki agar menyimpan sebagai transaksi baru.
-- Receipt scanner belum punya form koreksi rinci sebelum simpan; pengguna baru bisa scan ulang, input manual, atau simpan hasil.
-- Chatbot belum menerima konteks kategori, transaksi terbaru, atau periode spesifik, sehingga analisis seperti "kategori terbesar bulan ini" masih terbatas.
-- Tidak ada cloud sync, multi-dompet, budget per kategori, export CSV/PDF, atau backup data.
-- API key di client Flutter tetap berisiko untuk produksi; pendekatan production sebaiknya memakai backend proxy.
+## 1. Ringkasan Produk
 
-## 1. Ringkasan Eksekutif
-**Noma** adalah aplikasi pencatatan keuangan pribadi berbasis Android yang dirancang untuk mempermudah pengguna dalam melacak pemasukan dan pengeluaran sehari-hari. Berbeda dengan aplikasi pencatatan tradisional yang membutuhkan input manual yang kaku, Noma mengintegrasikan kecerdasan buatan (AI) berbasis cloud (Google Gemini Flash) untuk memungkinkan input melalui teks natural, pemindaian struk belanja, dan asisten pintar untuk menganalisis keuangan. Produk ini dibangun menggunakan Flutter dengan arsitektur Riverpod dan penyimpanan lokal SQLite, mengusung antarmuka modern Dark Mode dan efek Glassmorphism.
+Noma adalah aplikasi pencatatan keuangan pribadi berbasis Flutter untuk membantu pengguna mencatat pemasukan, pengeluaran, struk belanja, dan membaca laporan keuangan. Data utama disimpan lokal menggunakan SQLite melalui Drift, sehingga transaksi dan detail struk tetap tersedia secara offline.
 
-## 2. Latar Belakang & Masalah
-Mencatat keuangan pribadi seringkali dianggap sebagai tugas yang membosankan dan menyita waktu. Banyak pengguna merasa kesulitan konsisten mencatat pengeluaran karena:
-- Proses input manual pada aplikasi konvensional membutuhkan banyak langkah (memilih kategori, tanggal, memasukkan nominal).
-- Sering lupa mencatat pengeluaran kecil.
-- Kesulitan membaca pola pengeluaran dari data mentah tanpa analisis.
-- Menyimpan tumpukan struk belanja yang mudah hilang atau pudar, dan malas memindahkannya ke catatan digital.
+Noma menggabungkan input manual, input teks AI, scan struk, laporan keuangan, dan chatbot Nomi AI dalam satu aplikasi.
 
-## 3. Tujuan Produk
-Menciptakan pengalaman mencatat keuangan yang **cepat, minim gesekan (frictionless), dan pintar**.
-- Mengurangi waktu yang dibutuhkan untuk mencatat satu transaksi.
-- Meningkatkan retensi dan kebiasaan pengguna dalam mencatat pengeluaran.
-- Memberikan wawasan (insights) keuangan yang mudah dipahami melalui percakapan alami.
+## 2. Tujuan Produk
 
-## 4. Target Pengguna
-- **Demografi:** Dewasa muda, mahasiswa, pekerja awal (usia 18 - 35 tahun).
-- **Perilaku:** Terbiasa menggunakan smartphone, menyukai antarmuka aplikasi yang modern (dark mode), sibuk dan menginginkan efisiensi.
-- **Pain Point:** Sering merasa uang cepat habis tapi tidak tahu ke mana perginya, malas repot mencatat satu per satu.
+Tujuan utama Noma:
 
-## 5. Fitur & User Stories
+- Membuat pencatatan keuangan lebih cepat dan ringan.
+- Menyimpan histori transaksi secara lokal dan tidak menghapus data saat bulan berganti.
+- Membantu pengguna memahami pola pengeluaran dari kategori, merchant, dan item barang.
+- Menyediakan dashboard dan laporan yang tetap responsif meskipun data bertambah besar.
 
-### 5.1. Pencatatan Transaksi Manual
-Pengguna tetap memiliki opsi untuk mencatat transaksi dengan formulir standar jika mereka menginginkannya.
-- **US-1.1:** Sebagai pengguna, saya dapat memasukkan nominal transaksi menggunakan keypad angka, agar angka yang dimasukkan akurat.
-- **US-1.2:** Sebagai pengguna, saya dapat memilih apakah transaksi tersebut Pemasukan atau Pengeluaran.
-- **US-1.3:** Sebagai pengguna, saya dapat memilih kategori transaksi dari daftar yang sudah disediakan.
-- **US-1.4:** Sebagai pengguna, saya dapat menambahkan catatan singkat pada transaksi.
-- **US-1.5:** Sebagai pengguna, saya dapat menambah, mengedit, dan menghapus kategori kustom sesuai kebutuhan saya, selain kategori bawaan yang sudah disediakan.
-- **US-1.6:** Sebagai pengguna, saya dapat memilih metode pembayaran (Tunai, Gopay, OVO, Transfer Bank, dll) saat mencatat transaksi.
+## 3. Target Pengguna
 
-### 5.2. Pencatatan via Teks Natural (AI)
-Mencatat transaksi seolah-olah mengirim pesan teks ke asisten.
-- **US-2.1:** Sebagai pengguna, saya dapat mengetik kalimat seperti "Beli kopi senilai 35 ribu" pada kolom teks.
-- **US-2.2:** Sebagai sistem, saya dapat memparsing teks tersebut menggunakan AI untuk mengekstrak: Nominal (35.000), Tipe (Pengeluaran), Kategori (Makanan/Minuman), dan Catatan (Beli kopi).
-- **US-2.3:** Sebagai pengguna, saya dapat meninjau dan mengedit hasil ekstraksi AI sebelum menyimpannya ke database.
+Target pengguna Noma:
 
-### 5.3. Pemindaian Struk Belanja (Receipt Scanner AI)
-- **US-3.1:** Sebagai pengguna, saya dapat mengambil foto struk belanja menggunakan kamera aplikasi atau mengunggah dari galeri.
-- **US-3.2:** Sebagai sistem, saya akan mengirim gambar ke Cloud AI untuk membaca dan mengekstrak informasi penting.
-- **US-3.3:** Sebagai sistem, saya akan menampilkan hasil ekstraksi (Total belanja, Nama Toko, Tanggal, dan rekomendasi kategori) kepada pengguna.
-- **US-3.4:** Sebagai pengguna, saya dapat mengkonfirmasi atau memperbaiki data hasil pindaian sebelum menyimpannya.
+- Mahasiswa.
+- Pekerja awal.
+- Pengguna yang ingin mencatat uang harian tanpa proses rumit.
+- Pengguna yang sering belanja dengan struk dan ingin tahu barang apa yang paling banyak menghabiskan uang.
+- Pengguna yang ingin aplikasi keuangan pribadi offline-first.
 
-### 5.4. Chatbot Keuangan AI
-Asisten pintar yang memahami data transaksi pengguna.
-- **US-4.1:** Sebagai pengguna, saya dapat membuka halaman chat untuk bertanya kepada asisten AI.
-- **US-4.2:** Sebagai pengguna, saya dapat mengajukan pertanyaan seperti "Berapa total pengeluaranku minggu ini?" atau "Apa pengeluaran terbesarku bulan ini?".
-- **US-4.3:** Sebagai sistem, saya akan mengambil rangkuman data lokal yang relevan, mengirimkannya secara aman (anonim) sebagai konteks ke Cloud AI, dan mengembalikan jawaban yang mudah dimengerti.
+## 4. Fitur yang Sudah Ada
 
-### 5.5. Notifikasi Laporan Malam
-- **US-5.1:** Sebagai sistem, saya akan mengirimkan push notification lokal pada waktu yang ditentukan (default: 20:00).
-- **US-5.2:** Sebagai pengguna, saya akan melihat notifikasi berisi ringkasan pengeluaran hari ini (misal: "Pengeluaranmu hari ini Rp150.000. Jangan lupa catat semua transaksimu!").
-- **US-5.3:** Sebagai pengguna, saya dapat mengubah jam pengiriman notifikasi ini di halaman pengaturan.
+### 4.1 Dashboard
 
-### 5.6. Laporan Sederhana
-- **US-6.1:** Sebagai pengguna, saya dapat melihat total saldo, total pemasukan, dan total pengeluaran untuk periode berjalan (Harian/Mingguan/Bulanan) di halaman beranda.
-- **US-6.2:** Sebagai pengguna, saya dapat melihat daftar transaksi terbaru yang diurutkan dari yang paling baru.
-- **US-6.3:** Sebagai pengguna, saya dapat melihat grafik donat (donut chart) sederhana yang menunjukkan porsi pengeluaran berdasarkan kategori.
+Dashboard menampilkan:
 
-## 6. Non-Functional Requirements
-- **Performa:** Waktu respons dari AI (parsing teks/struk dan chatbot) tidak boleh lebih dari 3-5 detik pada koneksi internet stabil (4G/WiFi).
-- **Ketersediaan & Offline:** Aplikasi (kecuali fitur AI) harus sepenuhnya berfungsi secara offline. Data disimpan 100% lokal di perangkat (SQLite).
-- **Keamanan & Privasi:** Data transaksi sensitif tidak diunggah secara persisten ke server manapun. Saat menggunakan AI, data hanya dikirim sebagai konteks sementara ke API Google Gemini Flash dan tidak disimpan oleh pihak Noma.
-- **Ukuran Aplikasi:** Ukuran APK yang diunduh (download size) harus di bawah 30 MB untuk mendukung perangkat kelas menengah ke bawah.
-- **UI/UX:** Aplikasi wajib menggunakan Dark Mode secara default dengan elemen desain Glassmorphism (efek blur transparan pada card/modal) agar terlihat modern dan elegan.
+- Total saldo bersih.
+- Total pemasukan.
+- Total pengeluaran.
+- Grafik pemasukan dan pengeluaran.
+- Tren 7 hari terakhir.
+- Ringkasan bulan ini.
+- Riwayat transaksi.
+- Search transaksi.
+- Filter transaksi berdasarkan semua, pemasukan, atau pengeluaran.
+- Tombol `Muat Lagi` untuk pagination histori.
 
-## 7. Batasan & Asumsi
-- **Ketergantungan API:** Fitur parsing teks, pemindaian struk, dan chatbot bergantung pada ketersediaan dan stabilitas API Google Gemini Flash.
-- **Tanpa Cloud Sync:** Di versi MVP ini, jika perangkat pengguna hilang atau aplikasi dihapus (tanpa backup Android), maka data transaksi akan hilang.
-- **Sistem Operasi:** MVP hanya ditargetkan untuk platform Android.
-- **Satu Dompet:** Tidak ada pemisahan sumber dana (misal: Kas, Rekening Bank, E-Wallet). Semua dicatat dalam satu "Dompet" virtual yang sama.
+Catatan performa:
 
-## 8. Metrik Keberhasilan (MVP)
-- **Tingkat Akurasi AI:** 85% hasil parsing teks dan ekstraksi struk belanja dikonfirmasi pengguna tanpa perubahan manual.
-- **Waktu Input:** Rata-rata waktu pencatatan menggunakan teks natural atau struk lebih cepat 40% dibandingkan input manual.
-- **Retensi Hari ke-7 (D7 Retention):** Minimal 25% dari pengguna aktif mengaktifkan notifikasi malam dan melakukan pencatatan di hari ke-7 setelah instalasi.
+- Dashboard tidak memuat seluruh histori transaksi.
+- Riwayat transaksi dibatasi dengan query `LIMIT`.
+- Tombol `Muat Lagi` menambah jumlah transaksi yang dimuat secara bertahap.
+- Chart 7 hari memakai agregasi SQLite, bukan 10 transaksi terbaru.
+- Search memakai debounce 300ms.
 
-## 9. Risiko & Mitigasi
-- **Risiko:** Biaya operasional API AI membengkak seiring bertambahnya pengguna.
-  - **Mitigasi:** Menggunakan model "Flash" yang lebih ekonomis, menerapkan rate limiting (batas penggunaan AI harian per pengguna), dan membatasi ukuran konteks data yang dikirim ke AI pada fitur chatbot.
-- **Risiko:** Privasi pengguna terganggu karena pengiriman data ke Cloud AI.
-  - **Mitigasi:** Menyertakan halaman persetujuan (consent) yang jelas saat onboarding bahwa fitur pintar memerlukan pemrosesan cloud, dan memastikan data dikirim secara anonim tanpa identitas personal (PII).
-- **Risiko:** Pemindaian struk gagal karena kualitas foto buruk.
-  - **Mitigasi:** Memberikan panduan on-screen saat mode kamera aktif (misal: "Pastikan teks struk terbaca jelas dan cukup cahaya") dan memperbolehkan fallback ke input manual jika AI gagal mengenali.
+### 4.2 Pencatatan Manual
 
-## 10. Glosarium
-- **PRD:** Product Requirements Document, dokumen rujukan kebutuhan produk.
-- **MVP:** Minimum Viable Product, versi produk dengan fitur minimum yang cukup untuk dirilis ke pengguna awal guna mendapatkan umpan balik.
-- **Riverpod:** Framework state management modern untuk aplikasi Flutter.
-- **Drift:** Pustaka (library) *type-safe* dan reaktif untuk mengelola database SQLite di Flutter. Dipilih sebagai satu-satunya ORM/wrapper SQLite untuk proyek ini.
-- **Google Gemini Flash:** Varian model AI dari Google yang dioptimalkan untuk kecepatan dan efisiensi biaya.
-- **Glassmorphism:** Gaya desain antarmuka pengguna yang menonjolkan efek seperti kaca berembun (frosted glass) dengan tingkat transparansi dan keburaman (blur) tertentu.
+Pengguna dapat mencatat transaksi manual dengan data:
+
+- Jenis transaksi: pemasukan atau pengeluaran.
+- Nominal.
+- Kategori.
+- Catatan.
+- Metode pembayaran.
+- Tanggal transaksi.
+
+Transaksi manual dapat ditambah, diedit, dan dihapus.
+
+### 4.3 Input Teks AI
+
+Pengguna dapat mencatat transaksi dari kalimat natural. AI membantu membaca:
+
+- Nominal.
+- Jenis transaksi.
+- Kategori.
+- Catatan.
+- Metode pembayaran jika terdeteksi.
+
+Hasil AI tetap dapat ditinjau dan diedit sebelum disimpan.
+
+### 4.4 Scan Struk
+
+Pengguna dapat mengambil foto struk dari kamera atau galeri. Sistem mencoba membaca:
+
+- Nama toko atau merchant.
+- Tanggal transaksi.
+- Total belanja.
+- Kategori rekomendasi.
+- Nama item barang.
+- Jumlah item.
+- Harga item.
+
+Sebelum disimpan, pengguna dapat mengoreksi daftar item hasil scan.
+
+Catatan:
+
+- OCR struk saat ini masih menggunakan AI cloud.
+- Data hasil scan disimpan lokal setelah pengguna menyimpan transaksi.
+- Gambar struk disimpan sebagai path file, bukan BLOB besar di SQLite.
+
+### 4.5 Detail Item Struk
+
+Noma menyimpan detail item struk pada tabel terpisah yang terhubung ke transaksi.
+
+Data item mencakup:
+
+- Nama barang.
+- Jumlah.
+- Harga satuan jika tersedia.
+- Total harga item.
+- Relasi ke transaksi utama.
+
+Detail item dipakai untuk insight barang paling boros di laporan.
+
+### 4.6 Laporan dan Statistik
+
+Halaman laporan menampilkan:
+
+- Total pemasukan berdasarkan periode.
+- Total pengeluaran berdasarkan periode.
+- Grafik pemasukan vs pengeluaran.
+- Pengeluaran berdasarkan kategori.
+- Barang yang paling banyak menghabiskan uang.
+- Merchant atau toko terbesar.
+
+Periode laporan:
+
+- Bulan ini.
+- Bulan lalu.
+- Semua waktu.
+
+Catatan performa:
+
+- Laporan memakai query agregasi SQLite seperti `SUM`, `COUNT`, `GROUP BY`, `ORDER BY`, dan `LIMIT`.
+- Laporan tidak mengambil semua transaksi dan semua receipt item ke memory.
+
+### 4.7 Chatbot Nomi AI
+
+Nomi AI adalah chatbot keuangan yang dapat menjawab pertanyaan berdasarkan ringkasan data lokal.
+
+Konteks yang dikirim ke AI dibatasi pada data yang relevan:
+
+- Total saldo.
+- Total pemasukan.
+- Total pengeluaran.
+- Ringkasan bulan ini.
+- Kategori pengeluaran terbesar.
+- 5 transaksi terakhir.
+
+Catatan performa:
+
+- Chatbot tidak membaca seluruh histori transaksi.
+- Ringkasan dihitung dengan query agregasi.
+
+### 4.8 Kategori
+
+Noma menyediakan kategori bawaan untuk pemasukan dan pengeluaran.
+
+Contoh kategori pengeluaran:
+
+- Makanan & Minuman.
+- Belanja Harian.
+- Transportasi.
+- Tagihan & Utilitas.
+- Hiburan.
+- Kesehatan.
+- Pendidikan.
+
+Contoh kategori pemasukan:
+
+- Gaji.
+- Bonus & THR.
+- Investasi.
+- Usaha & Freelance.
+- Pemasukan Lainnya.
+
+Pengguna dapat menambah dan menghapus kategori kustom.
+
+### 4.9 Pengaturan
+
+Halaman pengaturan mencakup:
+
+- API key Gemini.
+- API key Groq.
+- Pengaturan notifikasi harian.
+- Manajemen kategori.
+- Pengaturan tampilan aplikasi.
+
+## 5. Offline-First dan Penyimpanan Data
+
+Noma memakai SQLite lokal sebagai penyimpanan utama.
+
+Prinsip data:
+
+- Transaksi tidak dihapus saat bulan berganti.
+- Pergantian bulan hanya mengubah filter query.
+- Histori lama tetap tersimpan.
+- Dashboard dan laporan hanya mengambil data yang dibutuhkan.
+- Data transaksi dan detail item struk tetap tersedia secara offline.
+
+Struktur konsep:
+
+```text
+SQLite lokal
+|-- Transaksi
+|-- Detail item struk
+|-- Kategori
+|-- Pengaturan
+`-- Histori chatbot
+```
+
+Catatan batasan:
+
+- Fitur AI cloud tetap membutuhkan internet.
+- Jika aplikasi dihapus tanpa backup perangkat, data lokal dapat hilang.
+- Belum ada cloud sync atau backup otomatis.
+
+## 6. Database dan Performa
+
+Database memakai Drift sebagai wrapper SQLite.
+
+Tabel utama:
+
+- `transactions`
+- `transaction_items`
+- `categories`
+- `chat_messages`
+- `app_settings`
+
+Index performa yang digunakan:
+
+- `transactions(transaction_date DESC, id DESC)`
+- `transactions(type, transaction_date)`
+- `transactions(category, transaction_date)`
+- `transaction_items(transaction_id)`
+
+Optimasi yang sudah diterapkan:
+
+- Pagination histori transaksi.
+- Query berdasarkan periode.
+- Aggregate query untuk summary.
+- Aggregate query untuk laporan.
+- Aggregate query untuk chart 7 hari.
+- Search debounce.
+- Detail item struk tidak dimuat massal di dashboard.
+- Chatbot memakai konteks terbatas.
+
+Target performa:
+
+- 10.000+ transaksi tetap nyaman digunakan.
+- 50.000+ transaksi tidak membuat seluruh histori dimuat ke memory.
+- 100.000 transaksi dapat diuji dengan perf smoke query.
+
+## 7. Non-Functional Requirements
+
+### 7.1 Performa
+
+- Dashboard harus memakai query terbatas dan agregasi database.
+- Laporan harus memakai agregasi database.
+- Histori transaksi harus memakai pagination.
+- Search tidak boleh query terlalu agresif pada setiap karakter.
+
+### 7.2 Offline
+
+- Transaksi, kategori, pengaturan, detail item struk, dan histori penting disimpan lokal.
+- AI cloud boleh gagal tanpa menghapus data lokal.
+- Pengguna tetap dapat melihat data yang sudah tersimpan tanpa internet.
+
+### 7.3 Privasi
+
+- Data utama tersimpan lokal.
+- Data hanya dikirim ke AI cloud saat pengguna memakai fitur AI.
+- API key disimpan di perangkat pengguna.
+
+### 7.4 UI/UX
+
+- Tampilan utama menggunakan dark mode dan glassmorphism.
+- Efek visual tidak boleh membuat list transaksi berat.
+- List besar harus tetap memakai pembatasan query atau pagination.
+
+## 8. Batasan Saat Ini
+
+- OCR struk belum 100% offline.
+- Belum ada backup lokal/export file.
+- Belum ada cloud sync.
+- Belum ada multi-wallet.
+- Belum ada budget per kategori.
+- API key masih berada di sisi client, sehingga untuk produksi publik lebih aman memakai backend proxy.
+- Migrasi penuh Drift web ke Wasm belum dilakukan karena target MVP adalah Android dan storage web tidak boleh diubah sembarangan.
+
+## 9. Risiko dan Mitigasi
+
+### Risiko: Biaya AI meningkat
+
+Mitigasi:
+
+- Gunakan model AI yang ekonomis.
+- Batasi konteks chatbot.
+- Gunakan fallback lokal untuk input teks jika memungkinkan.
+
+### Risiko: AI salah membaca struk
+
+Mitigasi:
+
+- Tampilkan hasil scan sebelum disimpan.
+- Izinkan koreksi item barang.
+- Sediakan fallback input manual.
+
+### Risiko: Data lokal hilang jika aplikasi dihapus
+
+Mitigasi:
+
+- Tambahkan fitur export/backup lokal pada fase berikutnya.
+
+### Risiko: Histori besar membuat aplikasi lambat
+
+Mitigasi:
+
+- Gunakan pagination.
+- Gunakan query periode.
+- Gunakan index SQLite.
+- Gunakan agregasi database.
+- Hindari load seluruh histori ke memory.
+
+## 10. Roadmap Berikutnya
+
+Prioritas berikutnya:
+
+1. Backup/export lokal.
+2. Budget bulanan per kategori.
+3. Detail transaksi struk yang lebih lengkap.
+4. Filter laporan custom range.
+5. Optimasi tampilan list dengan lazy sliver jika dashboard mulai terasa berat.
+6. Backend proxy opsional untuk AI jika aplikasi dirilis publik.
+
+## 11. Metrik Keberhasilan
+
+Metrik MVP:
+
+- Pengguna dapat mencatat transaksi manual dalam kurang dari 15 detik.
+- Pengguna dapat menyimpan hasil scan struk setelah koreksi.
+- Dashboard tetap responsif pada histori besar.
+- Laporan tetap memakai agregasi database.
+- Tidak ada error analyzer atau test pada build utama.
+
+## 12. Glosarium
+
+- **Noma:** Aplikasi pencatatan keuangan pribadi.
+- **Nomi AI:** Asisten AI di dalam Noma.
+- **SQLite:** Database lokal yang menyimpan data pengguna di perangkat.
+- **Drift:** Library Flutter untuk mengakses SQLite secara type-safe.
+- **Riverpod:** State management yang digunakan aplikasi.
+- **Receipt Scanner:** Fitur membaca struk belanja dari gambar.
+- **Glassmorphism:** Gaya tampilan seperti kaca transparan dengan blur.
+- **Pagination:** Teknik memuat data sedikit demi sedikit, bukan seluruh histori sekaligus.
+- **Aggregate Query:** Query database seperti `SUM`, `COUNT`, dan `GROUP BY` untuk menghitung data langsung di SQLite.

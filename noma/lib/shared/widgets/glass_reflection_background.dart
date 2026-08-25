@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/constants/app_colors.dart';
 
 /// Reusable Background Widget featuring ambient glow orbs
@@ -17,11 +18,12 @@ class GlassReflectionBackground extends StatefulWidget {
 class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> {
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
     return Stack(
       children: [
-        // 1. Deep Midnight Base Background
+        // 1. Deep Midnight / Warm Platinum Base Background
         Container(
-          color: AppColors.background,
+          color: colors.background,
         ),
 
         // 2. Ambient Glow Orb 1 (Top Left - Amber Sunset Glow)
@@ -36,7 +38,7 @@ class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> {
               color: AppColors.primary.withValues(alpha: 0.15),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.18),
+                  color: colors.orbColor1,
                   blurRadius: 140,
                   spreadRadius: 40,
                 ),
@@ -57,7 +59,7 @@ class _GlassReflectionBackgroundState extends State<GlassReflectionBackground> {
               color: AppColors.income.withValues(alpha: 0.12),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.income.withValues(alpha: 0.15),
+                  color: colors.orbColor2,
                   blurRadius: 120,
                   spreadRadius: 30,
                 ),

@@ -1,8 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_color_scheme.dart';
 import '../../core/theme/glass_theme.dart';
-
 import 'bouncy_tap.dart';
 
 /// Reusable Glassmorphism Card Widget
@@ -11,8 +10,8 @@ class GlassCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final double borderRadius;
-  final Color backgroundColor;
-  final Color borderColor;
+  final Color? backgroundColor;
+  final Color? borderColor;
   final VoidCallback? onTap;
   final List<BoxShadow>? shadows;
   final double? width;
@@ -24,8 +23,8 @@ class GlassCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(16),
     this.margin,
     this.borderRadius = GlassTheme.borderRadiusMedium,
-    this.backgroundColor = AppColors.glassCard,
-    this.borderColor = AppColors.glassBorder,
+    this.backgroundColor,
+    this.borderColor,
     this.onTap,
     this.shadows,
     this.width,
@@ -34,15 +33,21 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColorScheme.of(context);
+    final isLight = AppColorScheme.isLight(context);
+    final bgColor = backgroundColor ?? colors.glassCard;
+    final bdColor = borderColor ?? colors.glassBorder;
+
     Widget content = Container(
       width: width,
       height: height,
       padding: padding,
       decoration: GlassTheme.glassDecoration(
         borderRadius: borderRadius,
-        surfaceColor: backgroundColor,
-        borderColor: borderColor,
+        surfaceColor: bgColor,
+        borderColor: bdColor,
         shadows: shadows,
+        isLight: isLight,
       ),
       child: child,
     );
