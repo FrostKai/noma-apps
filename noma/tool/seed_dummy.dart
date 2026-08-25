@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -7,12 +9,24 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 const _source = 'dummy';
+const _androidPackage = 'com.example.noma';
+const _androidDbPath = 'app_flutter/noma_app.db';
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   final command = _command(args);
   if (command == null) {
     _printUsage();
     exitCode = 64;
+    return;
+  }
+
+  if (args.contains('--android')) {
+    try {
+      await _runAndroid(command, args);
+    } catch (e) {
+      stderr.writeln('Android dummy seeder failed: $e');
+      exitCode = 1;
+    }
     return;
   }
 
@@ -21,38 +35,19 @@ void main(List<String> args) {
   final db = sqlite3.open(dbPath);
 
   try {
-    _ensureSchema(db);
-
-    if (command == _SeedCommand.clear) {
-      _clearDummy(db);
-      print('Dummy data cleared.');
-      _printStats(db, dbPath);
-      return;
-    }
-
-    if (command == _SeedCommand.seed && _dummyCount(db) > 0) {
-      print('Dummy data already exists. Run with --reset to reseed.');
-      _printStats(db, dbPath);
-      return;
-    }
-
-    if (command == _SeedCommand.reset) {
-      _clearDummy(db);
-    }
-
-    _seedDummy(db);
-    print('Dummy seed completed.');
-    _printStats(db, dbPath);
+    final result = runDummySeedCommand(db, command);
+    print(result.message);
+    printDummyStats(result.after, dbPath: dbPath);
   } finally {
     db.dispose();
   }
 }
 
-_SeedCommand? _command(List<String> args) {
+DummySeedCommand? _command(List<String> args) {
   final commands = [
-    if (args.contains('--seed')) _SeedCommand.seed,
-    if (args.contains('--clear')) _SeedCommand.clear,
-    if (args.contains('--reset')) _SeedCommand.reset,
+    if (args.contains('--seed')) DummySeedCommand.seed,
+    if (args.contains('--clear')) DummySeedCommand.clear,
+    if (args.contains('--reset')) DummySeedCommand.reset,
   ];
   return commands.length == 1 ? commands.single : null;
 }
@@ -70,14 +65,407 @@ String _dbPath(List<String> args) {
   return p.join(home, 'Documents', 'noma_app.db');
 }
 
+Future<void> _runAndroid(DummySeedCommand command, List<String> args) async {
+  if (_hasDbArg(args)) {
+    throw ArgumentError('--db cannot be combined with --android.');
+  }
+
+  final adb = _findAdb();
+  if (adb == null) {
+    throw StateError(
+      'ADB tidak ditemukan. Pastikan Android SDK platform-tools tersedia.',
+    );
+  }
+
+  final device = await _selectAndroidDevice(adb, _deviceArg(args));
+  print('Android device: $device');
+  print('Package: $_androidPackage');
+  print('Runtime DB: /data/user/0/$_androidPackage/$_androidDbPath');
+
+  final dbCheck = await _runProcess(adb, [
+    '-s',
+    device,
+    'shell',
+    'run-as',
+    _androidPackage,
+    'ls',
+    _androidDbPath,
+  ]);
+  if (dbCheck.exitCode != 0) {
+    throw StateError(
+      'Database runtime tidak ditemukan atau package bukan debug build. '
+      'Jalankan Noma debug sekali, lalu coba lagi. Detail: ${dbCheck.stderr.trim()}',
+    );
+  }
+
+  final stop = await _runProcess(adb, [
+    '-s',
+    device,
+    'shell',
+    'am',
+    'force-stop',
+    _androidPackage,
+  ]);
+  if (stop.exitCode != 0) {
+    throw StateError('Gagal force-stop Noma: ${stop.stderr.trim()}');
+  }
+
+  try {
+    final entry = _writeAndroidSeedEntry();
+    final result = await _runFlutterSeed(
+      device: device,
+      entryPath: entry.path,
+      command: command,
+    );
+    if (result.output.contains('Android dummy operation failed')) {
+      throw StateError('Android seed runner reported failure.');
+    }
+    if (result.exitCode != 0 && !result.hasSuccessOutput) {
+      throw StateError(
+        'Flutter Android seed runner exited with code ${result.exitCode}.',
+      );
+    }
+  } finally {
+    await _restoreNormalAndroidApp(adb, device);
+  }
+}
+
+bool _hasDbArg(List<String> args) {
+  return args.any((arg) => arg == '--db' || arg.startsWith('--db='));
+}
+
+String? _deviceArg(List<String> args) {
+  for (var i = 0; i < args.length; i++) {
+    if (args[i] == '--device' && i + 1 < args.length) return args[i + 1];
+    if (args[i].startsWith('--device=')) return args[i].substring(9);
+  }
+  return null;
+}
+
+String? _findAdb() {
+  final envAdb = Platform.environment['ADB'];
+  if (envAdb != null && envAdb.isNotEmpty && File(envAdb).existsSync()) {
+    return envAdb;
+  }
+
+  final candidates = [
+    p.join(
+      Platform.environment['LOCALAPPDATA'] ?? '',
+      'Android',
+      'Sdk',
+      'platform-tools',
+      Platform.isWindows ? 'adb.exe' : 'adb',
+    ),
+    p.join(
+      Platform.environment['ANDROID_HOME'] ?? '',
+      'platform-tools',
+      Platform.isWindows ? 'adb.exe' : 'adb',
+    ),
+    p.join(
+      Platform.environment['ANDROID_SDK_ROOT'] ?? '',
+      'platform-tools',
+      Platform.isWindows ? 'adb.exe' : 'adb',
+    ),
+  ];
+
+  for (final candidate in candidates) {
+    if (candidate.isNotEmpty && File(candidate).existsSync()) {
+      return candidate;
+    }
+  }
+
+  final pathDirs = (Platform.environment['PATH'] ?? '').split(
+    Platform.isWindows ? ';' : ':',
+  );
+  for (final dir in pathDirs) {
+    final candidate = p.join(dir, Platform.isWindows ? 'adb.exe' : 'adb');
+    if (File(candidate).existsSync()) return candidate;
+  }
+  return null;
+}
+
+Future<String> _selectAndroidDevice(String adb, String? requested) async {
+  final result = await _runProcess(adb, ['devices']);
+  if (result.exitCode != 0) {
+    throw StateError('Gagal menjalankan adb devices: ${result.stderr.trim()}');
+  }
+
+  final devices = result.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.endsWith('\tdevice'))
+      .map((line) => line.split('\t').first)
+      .toList();
+
+  if (requested != null) {
+    if (!devices.contains(requested)) {
+      throw StateError(
+        'Device $requested tidak ditemukan. Device tersedia: ${devices.join(', ')}',
+      );
+    }
+    return requested;
+  }
+
+  if (devices.isEmpty) {
+    throw StateError('Tidak ada Android device aktif dari adb devices.');
+  }
+  if (devices.length > 1) {
+    throw StateError(
+      'Lebih dari satu Android device aktif: ${devices.join(', ')}. '
+      'Gunakan --device <id>.',
+    );
+  }
+  return devices.single;
+}
+
+Future<_ProcessResultText> _runProcess(
+  String executable,
+  List<String> args,
+) async {
+  final result = await Process.run(
+    executable,
+    args,
+    runInShell: Platform.isWindows,
+  );
+  return _ProcessResultText(
+    result.exitCode,
+    (result.stdout ?? '').toString(),
+    (result.stderr ?? '').toString(),
+  );
+}
+
+File _writeAndroidSeedEntry() {
+  final file = File(p.join('.dart_tool', 'noma_android_seed_entry.dart'));
+  file.parent.createSync(recursive: true);
+  file.writeAsStringSync(_androidSeedEntrySource);
+  return file;
+}
+
+Future<_FlutterSeedResult> _runFlutterSeed({
+  required String device,
+  required String entryPath,
+  required DummySeedCommand command,
+}) async {
+  final process = await Process.start('flutter', [
+    'run',
+    '-d',
+    device,
+    '-t',
+    entryPath,
+    '--debug',
+    '--dart-define=NOMA_DUMMY_SEED_COMMAND=${command.name}',
+  ], runInShell: Platform.isWindows);
+
+  final output = StringBuffer();
+  final stdoutDone = process.stdout.transform(utf8.decoder).forEach((data) {
+    stdout.write(data);
+    output.write(data);
+  });
+  final stderrDone = process.stderr.transform(utf8.decoder).forEach((data) {
+    stderr.write(data);
+    output.write(data);
+  });
+
+  try {
+    final exitCode = await process.exitCode.timeout(const Duration(minutes: 5));
+    await Future.wait([stdoutDone, stderrDone]);
+    return _FlutterSeedResult(exitCode, output.toString());
+  } on TimeoutException {
+    process.kill();
+    throw TimeoutException('Flutter Android seed runner timeout.');
+  }
+}
+
+Future<void> _restoreNormalAndroidApp(String adb, String device) async {
+  print('Restoring normal Noma debug app...');
+  final buildCode = await _runStreamingProcess('flutter', [
+    'build',
+    'apk',
+    '--debug',
+    '-t',
+    'lib/main.dart',
+  ], timeout: const Duration(minutes: 5));
+  if (buildCode != 0) {
+    throw StateError('Failed to rebuild normal Noma debug APK.');
+  }
+
+  final apk = p.join('build', 'app', 'outputs', 'flutter-apk', 'app-debug.apk');
+  final install = await _runProcess(adb, ['-s', device, 'install', '-r', apk]);
+  if (install.exitCode != 0) {
+    throw StateError('Failed to reinstall normal Noma app: ${install.stderr}');
+  }
+
+  await _runProcess(adb, [
+    '-s',
+    device,
+    'shell',
+    'am',
+    'force-stop',
+    _androidPackage,
+  ]);
+  print('Normal Noma debug app restored. Restart Noma to reload providers.');
+}
+
+Future<int> _runStreamingProcess(
+  String executable,
+  List<String> args, {
+  required Duration timeout,
+}) async {
+  final process = await Process.start(
+    executable,
+    args,
+    runInShell: Platform.isWindows,
+  );
+  final stdoutDone = process.stdout
+      .transform(utf8.decoder)
+      .forEach(stdout.write);
+  final stderrDone = process.stderr
+      .transform(utf8.decoder)
+      .forEach(stderr.write);
+  try {
+    final exitCode = await process.exitCode.timeout(timeout);
+    await Future.wait([stdoutDone, stderrDone]);
+    return exitCode;
+  } on TimeoutException {
+    process.kill();
+    throw TimeoutException('$executable ${args.join(' ')} timeout.');
+  }
+}
+
+class _ProcessResultText {
+  final int exitCode;
+  final String stdout;
+  final String stderr;
+
+  const _ProcessResultText(this.exitCode, this.stdout, this.stderr);
+}
+
+class _FlutterSeedResult {
+  final int exitCode;
+  final String output;
+
+  const _FlutterSeedResult(this.exitCode, this.output);
+
+  bool get hasSuccessOutput {
+    return output.contains('Android dummy seed completed.') ||
+        output.contains('Android dummy data already exists.') ||
+        output.contains('Android dummy data cleared.');
+  }
+}
+
+const _androidSeedEntrySource = r'''
+import 'dart:io';
+
+import 'package:flutter/widgets.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+
+import '../tool/seed_dummy.dart' as seed;
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isAndroid) {
+    await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
+  }
+
+  final commandName = const String.fromEnvironment('NOMA_DUMMY_SEED_COMMAND');
+  final command = seed.DummySeedCommand.values.firstWhere(
+    (value) => value.name == commandName,
+    orElse: () => throw ArgumentError('Invalid seed command: $commandName'),
+  );
+
+  final dbFolder = await getApplicationDocumentsDirectory();
+  final dbPath = p.join(dbFolder.path, 'noma_app.db');
+  final dbFile = File(dbPath);
+  if (!dbFile.existsSync()) {
+    stderr.writeln('Android runtime database not found: $dbPath');
+    exit(2);
+  }
+
+  final db = sqlite3.open(dbPath);
+  try {
+    final result = seed.runDummySeedCommand(db, command);
+    final message = switch (command) {
+      seed.DummySeedCommand.clear => 'Android dummy data cleared.',
+      seed.DummySeedCommand.seed when result.alreadyExisted =>
+        'Android dummy data already exists. Run with --reset --android to reseed.',
+      _ => 'Android dummy seed completed.',
+    };
+
+    print(message);
+    print('Database: Android runtime ($dbPath)');
+    print('Real transactions before: ${result.realBefore}');
+    print('Real transactions after: ${result.realAfter}');
+    seed.printDummyStats(result.after);
+    exit(0);
+  } catch (error, stackTrace) {
+    stderr.writeln('Android dummy operation failed: $error');
+    stderr.writeln(stackTrace);
+    exit(1);
+  } finally {
+    db.dispose();
+  }
+}
+''';
+
 void _printUsage() {
   print('Usage:');
   print('  dart run tool/seed_dummy.dart --seed [--db path/to/noma_app.db]');
   print('  dart run tool/seed_dummy.dart --reset [--db path/to/noma_app.db]');
   print('  dart run tool/seed_dummy.dart --clear [--db path/to/noma_app.db]');
+  print('  dart run tool/seed_dummy.dart --seed --android [--device id]');
+  print('  dart run tool/seed_dummy.dart --reset --android [--device id]');
+  print('  dart run tool/seed_dummy.dart --clear --android [--device id]');
 }
 
-void _ensureSchema(Database db) {
+DummySeedResult runDummySeedCommand(Database db, DummySeedCommand command) {
+  ensureDummySchema(db);
+  final realBefore = _realCount(db);
+  final before = readDummyStats(db);
+  var message = 'Dummy seed completed.';
+
+  if (command == DummySeedCommand.seed && before.transactions > 0) {
+    return DummySeedResult(
+      message: 'Dummy data already exists. Run with --reset to reseed.',
+      before: before,
+      after: before,
+      realBefore: realBefore,
+      realAfter: realBefore,
+      alreadyExisted: true,
+    );
+  }
+
+  if (command == DummySeedCommand.clear) {
+    _clearDummy(db);
+    message = 'Dummy data cleared.';
+  } else {
+    if (command == DummySeedCommand.reset) {
+      _clearDummy(db);
+    }
+    _seedDummy(db);
+  }
+
+  final after = readDummyStats(db);
+  final realAfter = _realCount(db);
+  if (realBefore != realAfter) {
+    throw StateError(
+      'Non-dummy transaction count changed from $realBefore to $realAfter.',
+    );
+  }
+
+  return DummySeedResult(
+    message: message,
+    before: before,
+    after: after,
+    realBefore: realBefore,
+    realAfter: realAfter,
+    alreadyExisted: false,
+  );
+}
+
+void ensureDummySchema(Database db) {
   db.execute('''
     CREATE TABLE IF NOT EXISTS transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,14 +541,6 @@ void _ensureSchema(Database db) {
   } finally {
     insertCategory.dispose();
   }
-}
-
-int _dummyCount(Database db) {
-  return db.select(
-        'SELECT COUNT(*) AS total FROM transactions WHERE source = ?',
-        [_source],
-      ).first['total']
-      as int;
 }
 
 void _clearDummy(Database db) {
@@ -268,7 +648,7 @@ void _seedDummy(Database db) {
   }
 }
 
-void _printStats(Database db, String dbPath) {
+DummyStats readDummyStats(Database db) {
   final row = db
       .select(
         '''
@@ -294,13 +674,34 @@ void _printStats(Database db, String dbPath) {
       )
       .first;
 
-  print('Database: $dbPath');
-  print('Transactions: ${row['transactions']}');
-  print('Income: ${row['income'] ?? 0}');
-  print('Expense: ${row['expense'] ?? 0}');
-  print('Receipt items: ${itemRow['items']}');
+  return DummyStats(
+    transactions: row['transactions'] as int? ?? 0,
+    income: row['income'] as int? ?? 0,
+    expense: row['expense'] as int? ?? 0,
+    receiptItems: itemRow['items'] as int? ?? 0,
+    minDateMs: row['min_date'] as int?,
+    maxDateMs: row['max_date'] as int?,
+  );
+}
+
+int _realCount(Database db) {
+  return db.select(
+        'SELECT COUNT(*) AS total FROM transactions WHERE source <> ?',
+        [_source],
+      ).first['total']
+      as int;
+}
+
+void printDummyStats(DummyStats stats, {String? dbPath}) {
+  if (dbPath != null) {
+    print('Database: $dbPath');
+  }
+  print('Transactions: ${stats.transactions}');
+  print('Income: ${stats.income}');
+  print('Expense: ${stats.expense}');
+  print('Receipt items: ${stats.receiptItems}');
   print(
-    'Range: ${_dateText(row['min_date'])} -> ${_dateText(row['max_date'])}',
+    'Range: ${_dateText(stats.minDateMs)} -> ${_dateText(stats.maxDateMs)}',
   );
 }
 
@@ -355,7 +756,43 @@ List<_Item> _itemsFor(String merchant, Random rng) {
   }).toList();
 }
 
-enum _SeedCommand { seed, clear, reset }
+enum DummySeedCommand { seed, clear, reset }
+
+class DummySeedResult {
+  final String message;
+  final DummyStats before;
+  final DummyStats after;
+  final int realBefore;
+  final int realAfter;
+  final bool alreadyExisted;
+
+  const DummySeedResult({
+    required this.message,
+    required this.before,
+    required this.after,
+    required this.realBefore,
+    required this.realAfter,
+    required this.alreadyExisted,
+  });
+}
+
+class DummyStats {
+  final int transactions;
+  final int income;
+  final int expense;
+  final int receiptItems;
+  final int? minDateMs;
+  final int? maxDateMs;
+
+  const DummyStats({
+    required this.transactions,
+    required this.income,
+    required this.expense,
+    required this.receiptItems,
+    required this.minDateMs,
+    required this.maxDateMs,
+  });
+}
 
 class _MonthPlan {
   final int month;
