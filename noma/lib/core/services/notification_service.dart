@@ -120,7 +120,11 @@ class NotificationService {
   }
 
   static Future<void> cancelDailyReminder() async {
-    await _notificationsPlugin.cancel(dailyReminderId);
+    try {
+      await _notificationsPlugin.cancel(dailyReminderId);
+    } catch (e) {
+      debugPrint('Error cancelling daily reminder: $e');
+    }
   }
 
   static tz.TZDateTime _nextInstanceOfTime({

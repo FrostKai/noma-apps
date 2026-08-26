@@ -7,7 +7,8 @@ import '../../../../core/services/api_key_service.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/providers/ai_service_provider.dart';
 import '../../../../shared/widgets/ai_key_setup_modal.dart';
-import '../../../../shared/widgets/floating_glass_card.dart';
+import '../../../../shared/widgets/glass_card.dart';
+import '../../../receipt_scanner/domain/receipt_review_utils.dart';
 import '../add_transaction_screen.dart';
 
 class AiSmartInputCard extends ConsumerStatefulWidget {
@@ -45,6 +46,9 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
     try {
       final aiService = ref.read(geminiApiServiceProvider);
       final result = await aiService.parseNaturalText(text);
+      final items = ReceiptReviewUtils.extractReceiptItems(
+        (result['items'] as List?) ?? const [],
+      );
 
       if (!mounted) return;
 
@@ -57,7 +61,7 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
       final parsedTx = Transaction(
         id: 0,
         type: (result['type'] as String?) ?? 'expense',
-        amount: (result['amount'] as num?)?.toDouble() ?? 0.0,
+        amount: ReceiptReviewUtils.extractTotalAmount(result),
         category: (result['category'] as String?) ?? 'Makanan & Minuman',
         description: result['description'] as String?,
         source: 'ai_text',
@@ -71,7 +75,10 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
       // Open Add Transaction Screen with AI pre-filled data
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => AddTransactionScreen(initialTransaction: parsedTx),
+          builder: (context) => AddTransactionScreen(
+            initialTransaction: parsedTx,
+            initialItems: items,
+          ),
         ),
       );
     } catch (e) {
@@ -96,70 +103,118 @@ class _AiSmartInputCardState extends ConsumerState<AiSmartInputCard> {
   @override
   Widget build(BuildContext context) {
     final colors = AppColorScheme.of(context);
-    return FloatingGlassCard(
-      padding: const EdgeInsets.all(16),
-      borderRadius: 20,
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      borderRadius: 18,
       borderColor: AppColors.primary.withValues(alpha: 0.45),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.glassBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.auto_awesome, color: AppColors.primary, size: 18),
+              const Icon(
+                Icons.auto_awesome,
+                color: AppColors.primary,
+                size: 18,
+              ),
               const SizedBox(width: 8),
-              Text(
-                'Catat Pintar via Teks AI',
-                style: AppTypography.labelLarge.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'AI Teks',
+                  style: AppTypography.labelLarge.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+              if (_isLoading)
+                Text(
+                  'Memproses...',
+                  style: AppTypography.caption.copyWith(
+                    color: colors.textMuted,
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _textController,
-                  enabled: !_isLoading,
-                  style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: "Contoh: 'Beli nasi goreng 25rb pake OVO'",
-                    hintStyle: AppTypography.caption.copyWith(color: colors.textMuted),
-                    border: InputBorder.none,
-                    isDense: true,
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
+            decoration: BoxDecoration(
+              color: colors.glassSurface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.glassBorder),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    enabled: !_isLoading,
+                    minLines: 1,
+                    maxLines: 3,
+                    textInputAction: TextInputAction.send,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Beli kopi 25rb qris',
+                      hintStyle: AppTypography.caption.copyWith(
+                        color: colors.textMuted,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _parseWithAi(),
                   ),
-                  onSubmitted: (_) => _parseWithAi(),
                 ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: _isLoading ? null : _parseWithAi,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: _isLoading ? null : _parseWithAi,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _isLoading
+                        ? const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.send_rounded,
                             color: Colors.white,
+                            size: 18,
                           ),
-                        )
-                      : const Icon(
-                          Icons.send_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Bisa pakai rincian item, misal: Indomie 3x 3500, susu 12000.',
+            style: AppTypography.caption.copyWith(color: colors.textMuted),
           ),
         ],
       ),

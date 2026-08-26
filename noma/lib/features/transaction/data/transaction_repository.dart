@@ -110,7 +110,10 @@ abstract class ITransactionRepository {
     int transactionId,
     List<TransactionItemInput> items,
   );
-  Future<bool> updateTransaction(Transaction transaction);
+  Future<bool> updateTransaction(
+    Transaction transaction, {
+    List<TransactionItemInput>? items,
+  });
   Future<int> deleteTransaction(int id);
 }
 
@@ -614,8 +617,22 @@ class TransactionRepository implements ITransactionRepository {
   }
 
   @override
-  Future<bool> updateTransaction(Transaction transaction) {
-    return _db.update(_db.transactions).replace(transaction);
+  Future<bool> updateTransaction(
+    Transaction transaction, {
+    List<TransactionItemInput>? items,
+  }) {
+    return _db.transaction(() async {
+      final success = await _db.update(_db.transactions).replace(transaction);
+      if (items != null) {
+        await (_db.delete(
+          _db.transactionItems,
+        )..where((t) => t.transactionId.equals(transaction.id))).go();
+        if (items.isNotEmpty) {
+          await _insertTransactionItems(transaction.id, items);
+        }
+      }
+      return success;
+    });
   }
 
   @override

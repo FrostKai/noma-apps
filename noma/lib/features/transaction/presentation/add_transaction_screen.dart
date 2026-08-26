@@ -12,15 +12,23 @@ import '../../../shared/providers/database_provider.dart';
 import '../../../shared/widgets/glass_button.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/glass_text_field.dart';
+import '../../receipt_scanner/domain/receipt_review_utils.dart';
+import '../data/transaction_repository.dart';
 import 'providers/transaction_provider.dart';
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
   final Transaction? initialTransaction;
+  final List<TransactionItemInput> initialItems;
 
-  const AddTransactionScreen({super.key, this.initialTransaction});
+  const AddTransactionScreen({
+    super.key,
+    this.initialTransaction,
+    this.initialItems = const [],
+  });
 
   @override
-  ConsumerState<AddTransactionScreen> createState() => _AddTransactionScreenState();
+  ConsumerState<AddTransactionScreen> createState() =>
+      _AddTransactionScreenState();
 }
 
 class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
@@ -30,6 +38,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   String? _selectedCategory;
   String _selectedPaymentMethod = 'Tunai';
   DateTime _selectedDate = DateTime.now();
+  final List<TransactionItemInput> _items = [];
 
   final List<String> _paymentMethods = [
     'Tunai',
@@ -50,13 +59,20 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       final tx = widget.initialTransaction!;
       _type = tx.type;
       final rawAmount = tx.amount.toInt();
-      _amountController.text = rawAmount > 0 ? NumberFormat.decimalPattern('id_ID').format(rawAmount) : '';
+      _amountController.text = rawAmount > 0
+          ? NumberFormat.decimalPattern('id_ID').format(rawAmount)
+          : '';
       _descController.text = tx.description ?? '';
       _selectedCategory = tx.category;
       _selectedPaymentMethod = tx.paymentMethod ?? 'Tunai';
       _selectedDate = DateTime.fromMillisecondsSinceEpoch(tx.transactionDate);
     } else {
       _type = 'expense';
+    }
+    _items.addAll(widget.initialItems);
+    if (widget.initialTransaction != null &&
+        widget.initialTransaction!.id != 0) {
+      Future.microtask(_loadExistingItems);
     }
   }
 
@@ -70,6 +86,29 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   double get _parsedAmount {
     final clean = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
     return double.tryParse(clean) ?? 0.0;
+  }
+
+  double get _itemsTotal => ReceiptReviewUtils.totalItems(_items);
+
+  Future<void> _loadExistingItems() async {
+    final tx = widget.initialTransaction!;
+    final repo = ref.read(transactionRepositoryProvider);
+    final rows = await repo.getTransactionItems(tx.id);
+    if (!mounted) return;
+    setState(() {
+      _items
+        ..clear()
+        ..addAll(
+          rows.map(
+            (item) => (
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+            ),
+          ),
+        );
+    });
   }
 
   Future<void> _selectDate() async {
@@ -135,7 +174,8 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
     final controller = ref.read(transactionControllerProvider.notifier);
 
-    final isActualEdit = widget.initialTransaction != null && widget.initialTransaction!.id != 0;
+    final isActualEdit =
+        widget.initialTransaction != null && widget.initialTransaction!.id != 0;
 
     if (isActualEdit) {
       final updated = widget.initialTransaction!.copyWith(
@@ -146,7 +186,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         paymentMethod: Value(_selectedPaymentMethod),
         transactionDate: _selectedDate.millisecondsSinceEpoch,
       );
-      final success = await controller.updateTransaction(updated);
+      final success = await controller.updateTransaction(
+        updated,
+        items: _type == 'expense' ? _items : const [],
+      );
       if (success && mounted) {
         Navigator.of(context).pop();
       }
@@ -156,10 +199,13 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         type: _type,
         amount: amount,
         category: _selectedCategory!,
-        description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+        description: _descController.text.trim().isEmpty
+            ? null
+            : _descController.text.trim(),
         source: source,
         paymentMethod: _selectedPaymentMethod,
         transactionDate: _selectedDate,
+        items: _type == 'expense' ? _items : const [],
       );
       if (success && mounted) {
         Navigator.of(context).pop();
@@ -170,7 +216,8 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = AppColorScheme.of(context);
-    final isEdit = widget.initialTransaction != null && widget.initialTransaction!.id != 0;
+    final isEdit =
+        widget.initialTransaction != null && widget.initialTransaction!.id != 0;
     final state = ref.watch(transactionControllerProvider);
     final categoriesAsync = _type == 'income'
         ? ref.watch(incomeCategoriesStreamProvider)
@@ -181,10 +228,15 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       appBar: AppBar(
         title: Text(
           isEdit ? 'Edit Transaksi' : 'Tambah Transaksi',
-          style: AppTypography.headingMedium.copyWith(color: colors.textPrimary),
+          style: AppTypography.headingMedium.copyWith(
+            color: colors.textPrimary,
+          ),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: colors.textPrimary),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: colors.textPrimary,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -202,19 +254,34 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             const SizedBox(height: 20),
 
             // Category Picker
-            Text('Kategori', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
+            Text(
+              'Kategori',
+              style: AppTypography.labelMedium.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 8),
             _buildCategoryPicker(context, categoriesAsync),
             const SizedBox(height: 20),
 
             // Payment Method Selector
-            Text('Metode Pembayaran', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
+            Text(
+              'Metode Pembayaran',
+              style: AppTypography.labelMedium.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 8),
             _buildPaymentMethodPicker(context),
             const SizedBox(height: 20),
 
             // Date Picker Card
-            Text('Tanggal Transaksi', style: AppTypography.labelMedium.copyWith(color: colors.textSecondary)),
+            Text(
+              'Tanggal Transaksi',
+              style: AppTypography.labelMedium.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 8),
             GlassCard(
               onTap: _selectDate,
@@ -223,15 +290,25 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today_rounded, color: AppColors.primary, size: 20),
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         DateFormatter.formatFullDate(_selectedDate),
-                        style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary),
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ],
                   ),
-                  Icon(Icons.edit_calendar_rounded, color: colors.textSecondary, size: 18),
+                  Icon(
+                    Icons.edit_calendar_rounded,
+                    color: colors.textSecondary,
+                    size: 18,
+                  ),
                 ],
               ),
             ),
@@ -244,13 +321,19 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               hintText: 'Misal: Nasi Goreng Spesial Pakai Telur',
               prefixIcon: Icons.edit_note_rounded,
             ),
+            if (_type == 'expense') ...[
+              const SizedBox(height: 20),
+              _buildItemsSection(context),
+            ],
             const SizedBox(height: 32),
 
             // Submit Button
             GlassButton(
               label: isEdit ? 'Simpan Perubahan' : 'Simpan Transaksi',
               icon: Icons.check_circle_outline_rounded,
-              variant: _type == 'income' ? GlassButtonVariant.income : GlassButtonVariant.expense,
+              variant: _type == 'income'
+                  ? GlassButtonVariant.income
+                  : GlassButtonVariant.expense,
               isLoading: state.isLoading,
               onPressed: _submit,
             ),
@@ -259,6 +342,207 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildItemsSection(BuildContext context) {
+    final colors = AppColorScheme.of(context);
+    final hasMismatch = ReceiptReviewUtils.hasTotalMismatch(
+      _parsedAmount,
+      _items,
+    );
+
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      borderRadius: 18,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Detail Item',
+                  style: AppTypography.labelLarge.copyWith(
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final item = await _showItemDialog(context);
+                  if (item != null) {
+                    setState(() => _items.add(item));
+                  }
+                },
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Tambah'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _items.isEmpty
+                ? 'Opsional untuk rincian belanja.'
+                : '${_items.length} item - total ${CurrencyFormatter.formatRupiah(_itemsTotal)}',
+            style: AppTypography.caption.copyWith(color: colors.textSecondary),
+          ),
+          if (hasMismatch) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Total item berbeda ${CurrencyFormatter.formatRupiah(ReceiptReviewUtils.totalDifference(_parsedAmount, _items).abs())}.',
+              style: AppTypography.caption.copyWith(color: AppColors.warning),
+            ),
+          ],
+          if (_items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Divider(color: colors.glassBorder),
+            ..._items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final unitText = item.unitPrice == null
+                  ? '${_formatQuantity(item.quantity)} item'
+                  : '${_formatQuantity(item.quantity)} x ${CurrencyFormatter.formatRupiah(item.unitPrice!)}';
+
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  item.name,
+                  style: AppTypography.labelMedium.copyWith(
+                    color: colors.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  unitText,
+                  style: AppTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      CurrencyFormatter.formatRupiah(item.totalPrice),
+                      style: AppTypography.caption.copyWith(
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        final edited = await _showItemDialog(
+                          context,
+                          initialItem: item,
+                        );
+                        if (edited != null) {
+                          setState(() => _items[index] = edited);
+                        }
+                      },
+                      icon: const Icon(Icons.edit_rounded, size: 18),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() => _items.removeAt(index)),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: AppColors.expense,
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<TransactionItemInput?> _showItemDialog(
+    BuildContext context, {
+    TransactionItemInput? initialItem,
+  }) async {
+    final nameController = TextEditingController(text: initialItem?.name ?? '');
+    final quantityController = TextEditingController(
+      text: initialItem == null ? '1' : _formatQuantity(initialItem.quantity),
+    );
+    final unitPriceController = TextEditingController(
+      text: initialItem?.unitPrice == null
+          ? ''
+          : initialItem!.unitPrice!.toInt().toString(),
+    );
+    final totalController = TextEditingController(
+      text: initialItem == null
+          ? ''
+          : initialItem.totalPrice.toInt().toString(),
+    );
+
+    final result = await showDialog<TransactionItemInput>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(initialItem == null ? 'Tambah Item' : 'Edit Item'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nama barang'),
+            ),
+            TextField(
+              controller: quantityController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Jumlah'),
+            ),
+            TextField(
+              controller: unitPriceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Harga satuan'),
+            ),
+            TextField(
+              controller: totalController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Total harga'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              final item = ReceiptReviewUtils.normalizeItem(
+                name: nameController.text,
+                quantity: ReceiptReviewUtils.parseQuantity(
+                  quantityController.text,
+                ),
+                unitPrice: ReceiptReviewUtils.parseAmount(
+                  unitPriceController.text,
+                ),
+                totalPrice: ReceiptReviewUtils.parseAmount(
+                  totalController.text,
+                ),
+              );
+
+              if (item.name.isEmpty || item.totalPrice <= 0) return;
+              Navigator.pop(context, item);
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+
+    nameController.dispose();
+    quantityController.dispose();
+    unitPriceController.dispose();
+    totalController.dispose();
+    return result;
+  }
+
+  String _formatQuantity(double quantity) {
+    return quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 1);
   }
 
   Widget _buildTypeToggle(BuildContext context) {
@@ -284,7 +568,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _type == 'expense' ? AppColors.expense : Colors.transparent,
+                  color: _type == 'expense'
+                      ? AppColors.expense
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: _type == 'expense'
                       ? [
@@ -302,13 +588,17 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                       Icon(
                         Icons.arrow_upward_rounded,
                         size: 18,
-                        color: _type == 'expense' ? Colors.white : colors.textSecondary,
+                        color: _type == 'expense'
+                            ? Colors.white
+                            : colors.textSecondary,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         'Pengeluaran',
                         style: AppTypography.labelLarge.copyWith(
-                          color: _type == 'expense' ? Colors.white : colors.textSecondary,
+                          color: _type == 'expense'
+                              ? Colors.white
+                              : colors.textSecondary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -324,13 +614,16 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                 setState(() {
                   _type = 'income';
                   _selectedCategory = null;
+                  _items.clear();
                 });
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _type == 'income' ? AppColors.income : Colors.transparent,
+                  color: _type == 'income'
+                      ? AppColors.income
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: _type == 'income'
                       ? [
@@ -348,13 +641,17 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                       Icon(
                         Icons.arrow_downward_rounded,
                         size: 18,
-                        color: _type == 'income' ? Colors.white : colors.textSecondary,
+                        color: _type == 'income'
+                            ? Colors.white
+                            : colors.textSecondary,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         'Pemasukan',
                         style: AppTypography.labelLarge.copyWith(
-                          color: _type == 'income' ? Colors.white : colors.textSecondary,
+                          color: _type == 'income'
+                              ? Colors.white
+                              : colors.textSecondary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -371,7 +668,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
   Widget _buildAmountCard(BuildContext context) {
     final colors = AppColorScheme.of(context);
-    final accentColor = _type == 'income' ? AppColors.income : AppColors.expense;
+    final accentColor = _type == 'income'
+        ? AppColors.income
+        : AppColors.expense;
     return GlassCard(
       padding: const EdgeInsets.all(20),
       borderRadius: 20,
@@ -396,7 +695,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [ThousandsSeparatorInputFormatter()],
                   onChanged: (val) => setState(() {}),
-                  style: AppTypography.amountDisplay.copyWith(color: colors.textPrimary),
+                  style: AppTypography.amountDisplay.copyWith(
+                    color: colors.textPrimary,
+                  ),
                   decoration: InputDecoration(
                     hintText: '0',
                     hintStyle: TextStyle(color: colors.textMuted),
@@ -418,7 +719,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     );
   }
 
-  Widget _buildCategoryPicker(BuildContext context, AsyncValue<List<Category>> categoriesAsync) {
+  Widget _buildCategoryPicker(
+    BuildContext context,
+    AsyncValue<List<Category>> categoriesAsync,
+  ) {
     final colors = AppColorScheme.of(context);
     return categoriesAsync.when(
       data: (categories) {
@@ -426,7 +730,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           return GlassCard(
             child: Text(
               'Belum ada kategori tersedia.',
-              style: AppTypography.caption.copyWith(color: colors.textSecondary),
+              style: AppTypography.caption.copyWith(
+                color: colors.textSecondary,
+              ),
             ),
           );
         }
@@ -450,7 +756,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             return ChoiceChip(
               label: Text(cat.name),
               selected: isSelected,
-              selectedColor: _type == 'income' ? AppColors.income : AppColors.expense,
+              selectedColor: _type == 'income'
+                  ? AppColors.income
+                  : AppColors.expense,
               backgroundColor: colors.glassSurface,
               side: BorderSide(
                 color: isSelected ? Colors.transparent : colors.glassBorder,
@@ -471,7 +779,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         );
       },
       loading: () => const LinearProgressIndicator(color: AppColors.primary),
-      error: (err, _) => Text('Error memuat kategori: $err', style: AppTypography.caption.copyWith(color: AppColors.expense)),
+      error: (err, _) => Text(
+        'Error memuat kategori: $err',
+        style: AppTypography.caption.copyWith(color: AppColors.expense),
+      ),
     );
   }
 

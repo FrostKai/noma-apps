@@ -112,6 +112,21 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     });
   }
 
+  void _finishProductTour() {
+    if (_isFabExpanded) _toggleFab();
+    AiKeySetupModal.dismiss();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    _onTabTapped(0);
+    ProductTourService.markTourAsCompleted();
+  }
+
+  void _skipProductTour() {
+    ShowcaseView.get().dismiss();
+    _finishProductTour();
+  }
+
   void _showAiTextInputModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -119,10 +134,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
       isScrollControlled: true,
       builder: (context) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 12,
           left: 16,
           right: 16,
-          top: 20,
+          top: 8,
         ),
         child: const AiSmartInputCard(),
       ),
@@ -159,14 +174,28 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     return ShowCaseWidget(
       enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 400),
-      onFinish: () {
-        if (_isFabExpanded) _toggleFab();
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
-        _onTabTapped(0);
-        ProductTourService.markTourAsCompleted();
-      },
+      onFinish: _finishProductTour,
+      globalFloatingActionWidget: (_) => FloatingActionWidget(
+        top: MediaQuery.of(context).padding.top + 12,
+        right: 16,
+        child: TextButton.icon(
+          onPressed: _skipProductTour,
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.black.withValues(alpha: 0.72),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+          ),
+          icon: const Icon(Icons.close_rounded, size: 18),
+          label: Text(
+            'Lewati',
+            style: AppTypography.labelMedium.copyWith(color: Colors.white),
+          ),
+        ),
+      ),
       onComplete: (index, key) {
         // Saat Step 3 (settingsAiKey) selesai (user klik Berikutnya),
         // Buka modal OverlayEntry & tunggu 300ms agar modal ter-render, lalu lanjutkan tour ke modalGroqBtn

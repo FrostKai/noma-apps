@@ -244,13 +244,16 @@ class TransactionController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> updateTransaction(Transaction transaction) async {
+  Future<bool> updateTransaction(
+    Transaction transaction, {
+    List<TransactionItemInput>? items,
+  }) async {
     state = const AsyncLoading();
     try {
       final updated = transaction.copyWith(
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
-      await _repo.updateTransaction(updated);
+      await _repo.updateTransaction(updated, items: items);
       state = const AsyncData(null);
       return true;
     } catch (e, stack) {

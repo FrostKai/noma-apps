@@ -6,6 +6,7 @@ import 'local_ai_engine.dart';
 
 class GeminiApiService {
   final Dio _dio;
+  static const String _groqTextModel = 'openai/gpt-oss-120b';
 
   static const List<String> _endpoints = [
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -115,11 +116,21 @@ Format JSON yang harus dihasilkan:
   "amount": angka (number/integer),
   "category": "nama kategori yang paling sesuai dari pilihan: Makanan & Minuman, Belanja Harian, Transportasi, Tagihan & Utilitas, Hiburan, Kesehatan, Pendidikan, Fashion & Kecantikan, Rumah Tangga, Gaji, Bonus & THR, Investasi, Usaha & Freelance, Lainnya",
   "description": "catatan singkat transaksi",
-  "payment_method": "metode pembayaran yang disebutkan (misal: Tunai, Gopay, OVO, ShopeePay, Transfer BCA, Mandiri, BRI, dll, atau 'Tunai' jika tidak ada)"
+  "payment_method": "metode pembayaran yang disebutkan (misal: Tunai, Gopay, OVO, ShopeePay, Transfer BCA, Mandiri, BRI, dll, atau 'Tunai' jika tidak ada)",
+  "items": [
+    {
+      "name": "nama barang jika disebutkan",
+      "quantity": angka jumlah barang,
+      "unit_price": angka harga satuan jika disebutkan,
+      "total_price": angka total harga item
+    }
+  ]
 }
 
 Catatan:
 - Pastikan amount adalah angka murni tanpa pemisah titik/koma.
+- Jika pengguna tidak menyebut rincian barang, isi "items" dengan array kosong [].
+- Jika amount tidak disebut tapi items jelas, amount boleh berupa total seluruh items.
 - Hanya kembalikan string JSON valid.
 ''';
 
@@ -386,7 +397,7 @@ Batasan wajib:
     final response = await _dio.post(
       'https://api.groq.com/openai/v1/chat/completions',
       data: {
-        'model': 'llama-3.3-70b-versatile',
+        'model': _groqTextModel,
         'response_format': {'type': 'json_object'},
         'messages': [
           {'role': 'system', 'content': systemPrompt},
@@ -436,11 +447,7 @@ Batasan wajib:
 
     final response = await _dio.post(
       'https://api.groq.com/openai/v1/chat/completions',
-      data: {
-        'model': 'llama-3.3-70b-versatile',
-        'messages': messages,
-        'temperature': 0.7,
-      },
+      data: {'model': _groqTextModel, 'messages': messages, 'temperature': 0.7},
       options: Options(
         headers: {
           'Content-Type': 'application/json',

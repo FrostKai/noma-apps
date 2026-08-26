@@ -92,6 +92,30 @@ void main() {
         throwsException,
       );
     });
+
+    test('parseNaturalText accepts optional transaction items', () async {
+      SharedPreferences.setMockInitialValues({});
+      await ApiKeyService.saveApiKey('AIzaSyTestKey');
+
+      final dio = Dio()
+        ..httpClientAdapter = _FakeAdapter((_) {
+          return _geminiResponse(
+            '{"type":"expense","amount":25000,"category":"Belanja Harian","description":"Indomaret","payment_method":"QRIS","items":[{"name":"Susu","quantity":2,"unit_price":10000,"total_price":20000},{"name":"Roti","quantity":1,"total_price":5000}]}',
+          );
+        });
+
+      final result = await GeminiApiService(
+        dio: dio,
+      ).parseNaturalText('indomaret susu 2x 10000 roti 5000 qris');
+      final items = ReceiptReviewUtils.extractReceiptItems(
+        result['items'] as List,
+      );
+
+      expect(result['amount'], 25000);
+      expect(items, hasLength(2));
+      expect(items.first.name, 'Susu');
+      expect(ReceiptReviewUtils.totalItems(items), 25000);
+    });
   });
 
   group('transaction items repository', () {
@@ -147,6 +171,35 @@ void main() {
         15000,
       );
     });
+
+    test(
+      'updates transaction and replaces items when items are provided',
+      () async {
+        final id = await _insertReceiptTransaction(
+          repo,
+          items: [
+            (name: 'Susu', quantity: 1, unitPrice: 12000, totalPrice: 12000),
+          ],
+        );
+        final tx = (await repo.getTransactionsPage(
+          limit: 50,
+          offset: 0,
+        )).single;
+
+        final updated = await repo.updateTransaction(
+          tx.copyWith(amount: 24000),
+          items: [
+            (name: 'Kopi', quantity: 2, unitPrice: 12000, totalPrice: 24000),
+          ],
+        );
+
+        final items = await repo.getTransactionItems(id);
+        expect(updated, isTrue);
+        expect(items, hasLength(1));
+        expect(items.single.name, 'Kopi');
+        expect(items.single.totalPrice, 24000);
+      },
+    );
 
     test('replaces receipt items and cascades on delete', () async {
       final id = await _insertReceiptTransaction(
