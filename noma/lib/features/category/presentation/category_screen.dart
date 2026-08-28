@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/providers/database_provider.dart';
 import '../../../shared/widgets/glass_button.dart';
@@ -18,6 +19,15 @@ class CategoryScreen extends ConsumerStatefulWidget {
 
 class _CategoryScreenState extends ConsumerState<CategoryScreen> {
   String _filterType = 'all'; // 'all', 'expense', 'income'
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.expense : AppColors.income,
+      ),
+    );
+  }
 
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
@@ -56,7 +66,12 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Tambah Kategori Baru', style: AppTypography.headingMedium.copyWith(color: colors.textPrimary)),
+                  Text(
+                    'Tambah Kategori Baru',
+                    style: AppTypography.headingMedium.copyWith(
+                      color: colors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 16),
 
                   // Category Type Selector
@@ -68,7 +83,9 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                           selected: categoryType == 'expense',
                           selectedColor: AppColors.expense,
                           onSelected: (val) {
-                            if (val) setModalState(() => categoryType = 'expense');
+                            if (val) {
+                              setModalState(() => categoryType = 'expense');
+                            }
                           },
                         ),
                       ),
@@ -79,7 +96,9 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                           selected: categoryType == 'income',
                           selectedColor: AppColors.income,
                           onSelected: (val) {
-                            if (val) setModalState(() => categoryType = 'income');
+                            if (val) {
+                              setModalState(() => categoryType = 'income');
+                            }
                           },
                         ),
                       ),
@@ -109,11 +128,19 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                           .addCategory(
                             name: name,
                             type: categoryType,
-                            color: categoryType == 'income' ? '#10B981' : '#F43F5E',
+                            color: categoryType == 'income'
+                                ? '#10B981'
+                                : '#F43F5E',
                           );
 
                       if (success) {
                         navigator.pop();
+                        _showSnackBar('Kategori berhasil ditambahkan.');
+                      } else {
+                        _showSnackBar(
+                          'Gagal menambahkan kategori.',
+                          isError: true,
+                        );
                       }
                     },
                   ),
@@ -123,7 +150,123 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
           },
         );
       },
-    );
+    ).whenComplete(nameController.dispose);
+  }
+
+  void _showEditCategoryDialog(Category category) {
+    final nameController = TextEditingController(text: category.name);
+    var categoryType = category.type == 'income' ? 'income' : 'expense';
+    final colors = AppColorScheme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.backgroundSecondary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalContext).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.glassBorder,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Edit Kategori',
+                    style: AppTypography.headingMedium.copyWith(
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(child: Text('Pengeluaran')),
+                          selected: categoryType == 'expense',
+                          selectedColor: AppColors.expense,
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() => categoryType = 'expense');
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(child: Text('Pemasukan')),
+                          selected: categoryType == 'income',
+                          selectedColor: AppColors.income,
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() => categoryType = 'income');
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  GlassTextField(
+                    controller: nameController,
+                    labelText: 'Nama Kategori',
+                    hintText: 'Misal: Langganan Streaming',
+                    prefixIcon: Icons.category_rounded,
+                  ),
+                  const SizedBox(height: 24),
+                  GlassButton(
+                    label: 'Simpan Perubahan',
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) return;
+
+                      final navigator = Navigator.of(modalContext);
+                      final success = await ref
+                          .read(categoryControllerProvider.notifier)
+                          .updateCategory(
+                            category: category,
+                            name: name,
+                            type: categoryType,
+                          );
+
+                      if (success) {
+                        navigator.pop();
+                        _showSnackBar('Kategori berhasil diperbarui.');
+                      } else {
+                        _showSnackBar(
+                          'Gagal memperbarui kategori.',
+                          isError: true,
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(nameController.dispose);
   }
 
   @override
@@ -134,16 +277,25 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
-        title: Text('Manajemen Kategori', style: AppTypography.headingMedium.copyWith(color: colors.textPrimary)),
+        title: Text(
+          'Manajemen Kategori',
+          style: AppTypography.headingMedium.copyWith(
+            color: colors.textPrimary,
+          ),
+        ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: colors.textPrimary),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: colors.textPrimary,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: Column(
         children: [
           // Filter Chips
-          Padding(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
@@ -169,7 +321,9 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                   return Center(
                     child: Text(
                       'Tidak ada kategori ditemukan',
-                      style: AppTypography.bodyMedium.copyWith(color: colors.textSecondary),
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: colors.textSecondary,
+                      ),
                     ),
                   );
                 }
@@ -203,7 +357,9 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                               isIncome
                                   ? Icons.arrow_downward_rounded
                                   : Icons.arrow_upward_rounded,
-                              color: isIncome ? AppColors.income : AppColors.expense,
+                              color: isIncome
+                                  ? AppColors.income
+                                  : AppColors.expense,
                               size: 20,
                             ),
                           ),
@@ -212,59 +368,115 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(cat.name, style: AppTypography.labelLarge.copyWith(color: colors.textPrimary)),
+                                Text(
+                                  cat.name,
+                                  style: AppTypography.labelLarge.copyWith(
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
                                 const SizedBox(height: 2),
                                 Text(
                                   isIncome ? 'Pemasukan' : 'Pengeluaran',
-                                  style: AppTypography.caption.copyWith(color: colors.textMuted),
+                                  style: AppTypography.caption.copyWith(
+                                    color: colors.textMuted,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          if (cat.isDefault)
+                          if (cat.isDefault) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: colors.glassSurface,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: colors.glassBorder),
                               ),
-                              child: Text('Default', style: AppTypography.caption.copyWith(color: colors.textMuted)),
-                            )
-                          else
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded, color: AppColors.expense, size: 20),
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Hapus Kategori?'),
-                                    content: Text('Yakin ingin menghapus kategori "${cat.name}"?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Batal'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Hapus', style: TextStyle(color: AppColors.expense)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  ref.read(categoryControllerProvider.notifier).deleteCategory(cat.id);
-                                }
-                              },
+                              child: Text(
+                                'Default',
+                                style: AppTypography.caption.copyWith(
+                                  color: colors.textMuted,
+                                ),
+                              ),
                             ),
+                            const SizedBox(width: 4),
+                          ],
+                          IconButton(
+                            tooltip: 'Edit',
+                            icon: Icon(
+                              Icons.edit_rounded,
+                              color: colors.textMuted,
+                              size: 20,
+                            ),
+                            onPressed: () => _showEditCategoryDialog(cat),
+                          ),
+                          IconButton(
+                            tooltip: 'Hapus',
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.expense,
+                              size: 20,
+                            ),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Hapus Kategori?'),
+                                  content: Text(
+                                    'Yakin ingin menghapus kategori "${cat.name}"? Transaksi lama tetap disimpan.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Batal'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text(
+                                        'Hapus',
+                                        style: TextStyle(
+                                          color: AppColors.expense,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                final success = await ref
+                                    .read(categoryControllerProvider.notifier)
+                                    .deleteCategory(cat.id);
+                                _showSnackBar(
+                                  success
+                                      ? 'Kategori berhasil dihapus.'
+                                      : 'Gagal menghapus kategori.',
+                                  isError: !success,
+                                );
+                              }
+                            },
+                          ),
                         ],
                       ),
                     );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (err, _) => Center(child: Text('Error: $err', style: AppTypography.caption.copyWith(color: colors.textSecondary))),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+              error: (err, _) => Center(
+                child: Text(
+                  'Error: $err',
+                  style: AppTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -273,7 +485,10 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
         onPressed: _showAddCategoryDialog,
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('Kategori Baru', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+        label: Text(
+          'Kategori Baru',
+          style: AppTypography.labelLarge.copyWith(color: Colors.white),
+        ),
       ),
     );
   }

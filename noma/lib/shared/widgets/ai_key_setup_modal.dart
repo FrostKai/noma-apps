@@ -9,6 +9,7 @@ import '../../core/constants/app_color_scheme.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/product_tour_keys.dart';
 import '../../core/services/api_key_service.dart';
+import '../../core/services/gemini_api_service.dart';
 import '../../core/theme/app_typography.dart';
 import 'glass_button.dart';
 import 'glass_card.dart';
@@ -48,7 +49,8 @@ class AiKeySetupModal extends StatefulWidget {
   State<AiKeySetupModal> createState() => _AiKeySetupModalState();
 }
 
-class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingObserver {
+class _AiKeySetupModalState extends State<AiKeySetupModal>
+    with WidgetsBindingObserver {
   final TextEditingController _groqController = TextEditingController();
   final TextEditingController _geminiController = TextEditingController();
 
@@ -148,12 +150,18 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
   Future<void> _saveGroqKey(String key) async {
     final cleanKey = ApiKeyService.sanitizeKey(key);
     if (cleanKey.isEmpty) {
-      _showModalToast('Masukkan Groq API Key terlebih dahulu.', color: AppColors.expense);
+      _showModalToast(
+        'Masukkan Groq API Key terlebih dahulu.',
+        color: AppColors.expense,
+      );
       return;
     }
 
     if (cleanKey.startsWith('AIzaSy') || cleanKey.startsWith('AQ.')) {
-      _showModalToast('Ini Kunci Gemini. Pasang di kolom Gemini di bawah.', color: AppColors.warning);
+      _showModalToast(
+        'Ini Kunci Gemini. Pasang di kolom Gemini di bawah.',
+        color: AppColors.warning,
+      );
       return;
     }
 
@@ -164,15 +172,17 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
       final response = await dio.post(
         'https://api.groq.com/openai/v1/chat/completions',
         data: {
-          'model': 'llama-3.3-70b-versatile',
+          'model': GeminiApiService.groqTextModel,
           'messages': [
-            {'role': 'user', 'content': 'ping'}
-          ]
+            {'role': 'user', 'content': 'ping'},
+          ],
         },
-        options: Options(headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $cleanKey',
-        }),
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $cleanKey',
+          },
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -186,8 +196,10 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
       if (!mounted) return;
       String errMsg = 'Gagal verifikasi Groq Key.';
       if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
-        errMsg = 'API Key Groq tidak valid. Periksa kembali kunci dari console.groq.com';
-      } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+        errMsg =
+            'API Key Groq tidak valid. Periksa kembali kunci dari console.groq.com';
+      } else if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.connectionError) {
         errMsg = 'Koneksi timeout. Menyimpan kunci Groq secara lokal...';
         await ApiKeyService.saveApiKey(cleanKey);
         setState(() => _isGroqSaved = true);
@@ -198,7 +210,10 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
       _showModalToast(errMsg, color: AppColors.expense);
     } catch (e) {
       if (!mounted) return;
-      _showModalToast('Error Groq Key: ${e.toString().replaceAll('Exception: ', '')}', color: AppColors.expense);
+      _showModalToast(
+        'Error Groq Key: ${e.toString().replaceAll('Exception: ', '')}',
+        color: AppColors.expense,
+      );
     } finally {
       if (mounted) setState(() => _isTestingGroq = false);
     }
@@ -207,12 +222,18 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
   Future<void> _saveGeminiKey(String key) async {
     final cleanKey = ApiKeyService.sanitizeKey(key);
     if (cleanKey.isEmpty) {
-      _showModalToast('Masukkan Gemini API Key terlebih dahulu.', color: AppColors.expense);
+      _showModalToast(
+        'Masukkan Gemini API Key terlebih dahulu.',
+        color: AppColors.expense,
+      );
       return;
     }
 
     if (cleanKey.startsWith('gsk_')) {
-      _showModalToast('Ini Kunci Groq. Pasang di kolom Groq di atas.', color: AppColors.warning);
+      _showModalToast(
+        'Ini Kunci Groq. Pasang di kolom Groq di atas.',
+        color: AppColors.warning,
+      );
       return;
     }
 
@@ -236,15 +257,17 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
               'contents': [
                 {
                   'parts': [
-                    {'text': 'ping'}
-                  ]
-                }
-              ]
+                    {'text': 'ping'},
+                  ],
+                },
+              ],
             },
-            options: Options(headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': cleanKey,
-            }),
+            options: Options(
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': cleanKey,
+              },
+            ),
           );
           if (response.statusCode == 200) {
             isValid = true;
@@ -258,7 +281,9 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
 
       setState(() => _isGeminiSaved = true);
       _showModalToast(
-        isValid ? 'Gemini Key Valid & Tersimpan!' : 'Gemini Key Berhasil Disimpan!',
+        isValid
+            ? 'Gemini Key Valid & Tersimpan!'
+            : 'Gemini Key Berhasil Disimpan!',
         color: AppColors.income,
       );
       widget.onKeySaved?.call();
@@ -352,9 +377,14 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                   setState(() {
                     _dragOffset += details.primaryDelta!;
                   });
-                } else if (details.primaryDelta != null && details.primaryDelta! < 0 && _dragOffset > 0) {
+                } else if (details.primaryDelta != null &&
+                    details.primaryDelta! < 0 &&
+                    _dragOffset > 0) {
                   setState(() {
-                    _dragOffset = (_dragOffset + details.primaryDelta!).clamp(0.0, 500.0);
+                    _dragOffset = (_dragOffset + details.primaryDelta!).clamp(
+                      0.0,
+                      500.0,
+                    );
                   });
                 }
               },
@@ -382,7 +412,9 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                     ),
                     decoration: BoxDecoration(
                       color: colors.backgroundSecondary.withValues(alpha: 0.98),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
                       border: Border.all(color: colors.glassBorder, width: 1.5),
                       boxShadow: [
                         BoxShadow(
@@ -418,13 +450,18 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               margin: const EdgeInsets.only(bottom: 14),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: _modalToastColor,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: _modalToastColor.withValues(alpha: 0.4),
+                                    color: _modalToastColor.withValues(
+                                      alpha: 0.4,
+                                    ),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -436,8 +473,8 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                     _modalToastColor == AppColors.income
                                         ? Icons.check_circle_rounded
                                         : (_modalToastColor == AppColors.warning
-                                            ? Icons.warning_amber_rounded
-                                            : Icons.error_outline_rounded),
+                                              ? Icons.warning_amber_rounded
+                                              : Icons.error_outline_rounded),
                                     color: Colors.white,
                                     size: 20,
                                   ),
@@ -445,7 +482,9 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                   Expanded(
                                     child: Text(
                                       _modalToastMessage!,
-                                      style: AppTypography.labelMedium.copyWith(color: Colors.white),
+                                      style: AppTypography.labelMedium.copyWith(
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -459,22 +498,34 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.2),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
                                   shape: BoxShape.circle,
                                   border: Border.all(color: AppColors.primary),
                                 ),
-                                child: const Icon(Icons.key_rounded, color: AppColors.primary, size: 24),
+                                child: const Icon(
+                                  Icons.key_rounded,
+                                  color: AppColors.primary,
+                                  size: 24,
+                                ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                     Text('Pengaturan API Key AI', style: AppTypography.headingSmall.copyWith(color: colors.textPrimary)),
-                                     Text(
-                                       'Input Kunci Groq & Gemini Terpisah',
-                                       style: AppTypography.caption.copyWith(color: colors.textSecondary),
-                                     ),
+                                    Text(
+                                      'Pengaturan API Key AI',
+                                      style: AppTypography.headingSmall
+                                          .copyWith(color: colors.textPrimary),
+                                    ),
+                                    Text(
+                                      'Input Kunci Groq & Gemini Terpisah',
+                                      style: AppTypography.caption.copyWith(
+                                        color: colors.textSecondary,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -489,20 +540,36 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                               decoration: BoxDecoration(
                                 color: AppColors.income.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.income.withValues(alpha: 0.5)),
+                                border: Border.all(
+                                  color: AppColors.income.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.content_paste_rounded, color: AppColors.income, size: 18),
+                                  const Icon(
+                                    Icons.content_paste_rounded,
+                                    color: AppColors.income,
+                                    size: 18,
+                                  ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text('Kunci Terdeteksi dari Clipboard',
-                                            style: AppTypography.labelMedium.copyWith(color: AppColors.income)),
                                         Text(
-                                          _detectedKeyInClipboard!.startsWith('gsk_')
+                                          'Kunci Terdeteksi dari Clipboard',
+                                          style: AppTypography.labelMedium
+                                              .copyWith(
+                                                color: AppColors.income,
+                                              ),
+                                        ),
+                                        Text(
+                                          _detectedKeyInClipboard!.startsWith(
+                                                'gsk_',
+                                              )
                                               ? 'Format Groq Key (Chatbot & Analisis)'
                                               : 'Format Gemini Key (Scan Struk)',
                                           style: AppTypography.caption,
@@ -516,12 +583,18 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                     height: 34,
                                     width: 70,
                                     onPressed: () {
-                                      if (_detectedKeyInClipboard!.startsWith('gsk_')) {
-                                        _groqController.text = _detectedKeyInClipboard!;
+                                      if (_detectedKeyInClipboard!.startsWith(
+                                        'gsk_',
+                                      )) {
+                                        _groqController.text =
+                                            _detectedKeyInClipboard!;
                                         _saveGroqKey(_detectedKeyInClipboard!);
                                       } else {
-                                        _geminiController.text = _detectedKeyInClipboard!;
-                                        _saveGeminiKey(_detectedKeyInClipboard!);
+                                        _geminiController.text =
+                                            _detectedKeyInClipboard!;
+                                        _saveGeminiKey(
+                                          _detectedKeyInClipboard!,
+                                        );
                                       }
                                     },
                                   ),
@@ -539,12 +612,17 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.income, size: 18),
+                                          const Icon(
+                                            Icons.chat_bubble_outline_rounded,
+                                            color: AppColors.income,
+                                            size: 18,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
@@ -563,30 +641,54 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                       description:
                                           'Ketuk tombol ini → console.groq.com terbuka.\n'
                                           'Buat API Key baru gratis lalu salin (copy) kuncinya.',
-                                      targetBorderRadius: BorderRadius.circular(20),
+                                      targetBorderRadius: BorderRadius.circular(
+                                        20,
+                                      ),
                                       targetPadding: const EdgeInsets.all(4),
-                                      tooltipBackgroundColor: const Color(0xE61A1A2E),
-                                      titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                      descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                                      tooltipBackgroundColor: const Color(
+                                        0xE61A1A2E,
+                                      ),
+                                      titleTextStyle: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                      descTextStyle: const TextStyle(
+                                        color: Color(0xD9FFFFFF),
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
                                       child: InkWell(
                                         borderRadius: BorderRadius.circular(20),
                                         onTap: _openGroqConsole,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.4),
+                                            ),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
                                                 'Ambil Key',
-                                                style: AppTypography.caption.copyWith(
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                                style: AppTypography.caption
+                                                    .copyWith(
+                                                      color: AppColors.primary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                               ),
                                               const SizedBox(width: 4),
                                               const Icon(
@@ -602,69 +704,126 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text('Kunci untuk Chatbot Nomi AI & Analisis Finansial (console.groq.com)', style: AppTypography.caption),
+                                Text(
+                                  'Kunci untuk Chatbot Nomi AI & Analisis Finansial (console.groq.com)',
+                                  style: AppTypography.caption,
+                                ),
                                 const SizedBox(height: 12),
                                 Showcase(
                                   key: ProductTourKeys.modalGroqInput,
                                   title: '2. Tempel & Simpan Groq Key',
-                                  description: 'Tempelkan kunci gsk_... di kolom ini lalu tekan Simpan.',
+                                  description:
+                                      'Tempelkan kunci gsk_... di kolom ini lalu tekan Simpan.',
                                   targetBorderRadius: BorderRadius.circular(14),
                                   targetPadding: const EdgeInsets.all(2),
-                                  tooltipBackgroundColor: const Color(0xE61A1A2E),
-                                  titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                  descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                                  tooltipBackgroundColor: const Color(
+                                    0xE61A1A2E,
+                                  ),
+                                  titleTextStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                  descTextStyle: const TextStyle(
+                                    color: Color(0xD9FFFFFF),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                  ),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: TextField(
                                           controller: _groqController,
                                           obscureText: _obscureGroq,
-                                          style: TextStyle(color: colors.textPrimary, fontSize: 13),
+                                          style: TextStyle(
+                                            color: colors.textPrimary,
+                                            fontSize: 13,
+                                          ),
                                           onChanged: (val) {
-                                            if (_isGroqSaved) setState(() => _isGroqSaved = false);
+                                            if (_isGroqSaved) {
+                                              setState(
+                                                () => _isGroqSaved = false,
+                                              );
+                                            }
                                           },
                                           decoration: InputDecoration(
                                             hintText: 'gsk_...',
-                                            hintStyle: TextStyle(color: colors.textMuted.withValues(alpha: 0.5)),
+                                            hintStyle: TextStyle(
+                                              color: colors.textMuted
+                                                  .withValues(alpha: 0.5),
+                                            ),
                                             filled: true,
                                             fillColor: colors.background,
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 10,
+                                                ),
                                             suffixIcon: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                if (_groqController.text.isNotEmpty)
+                                                if (_groqController
+                                                    .text
+                                                    .isNotEmpty)
                                                   IconButton(
-                                                    icon: Icon(Icons.clear_rounded, size: 16, color: colors.textMuted),
+                                                    icon: Icon(
+                                                      Icons.clear_rounded,
+                                                      size: 16,
+                                                      color: colors.textMuted,
+                                                    ),
                                                     onPressed: _clearGroqKey,
                                                   ),
                                                 IconButton(
                                                   icon: Icon(
-                                                    _obscureGroq ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                                    _obscureGroq
+                                                        ? Icons
+                                                              .visibility_off_rounded
+                                                        : Icons
+                                                              .visibility_rounded,
                                                     size: 18,
                                                     color: colors.textSecondary,
                                                   ),
-                                                  onPressed: () => setState(() => _obscureGroq = !_obscureGroq),
+                                                  onPressed: () => setState(
+                                                    () => _obscureGroq =
+                                                        !_obscureGroq,
+                                                  ),
                                                 ),
                                               ],
                                             ),
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: BorderSide(color: colors.glassBorder),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide(
+                                                color: colors.glassBorder,
+                                              ),
                                             ),
                                             focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: const BorderSide(color: AppColors.primary),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: const BorderSide(
+                                                color: AppColors.primary,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
                                       GlassButton(
-                                        label: _isTestingGroq ? '...' : (_isGroqSaved ? 'Tersimpan' : 'Simpan'),
-                                        variant: _isGroqSaved ? GlassButtonVariant.income : GlassButtonVariant.warning,
+                                        label: _isTestingGroq
+                                            ? '...'
+                                            : (_isGroqSaved
+                                                  ? 'Tersimpan'
+                                                  : 'Simpan'),
+                                        variant: _isGroqSaved
+                                            ? GlassButtonVariant.income
+                                            : GlassButtonVariant.warning,
                                         width: 90,
                                         height: 42,
-                                        onPressed: _isTestingGroq ? null : () => _saveGroqKey(_groqController.text),
+                                        onPressed: _isTestingGroq
+                                            ? null
+                                            : () => _saveGroqKey(
+                                                _groqController.text,
+                                              ),
                                       ),
                                     ],
                                   ),
@@ -682,12 +841,17 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.camera_alt_outlined, color: AppColors.primary, size: 18),
+                                          const Icon(
+                                            Icons.camera_alt_outlined,
+                                            color: AppColors.primary,
+                                            size: 18,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
@@ -706,30 +870,54 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                       description:
                                           'Ketuk tombol ini → aistudio.google.com terbuka.\n'
                                           'Buat API Key gratis lalu salin kuncinya.',
-                                      targetBorderRadius: BorderRadius.circular(20),
+                                      targetBorderRadius: BorderRadius.circular(
+                                        20,
+                                      ),
                                       targetPadding: const EdgeInsets.all(4),
-                                      tooltipBackgroundColor: const Color(0xE61A1A2E),
-                                      titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                      descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                                      tooltipBackgroundColor: const Color(
+                                        0xE61A1A2E,
+                                      ),
+                                      titleTextStyle: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                      descTextStyle: const TextStyle(
+                                        color: Color(0xD9FFFFFF),
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
                                       child: InkWell(
                                         borderRadius: BorderRadius.circular(20),
                                         onTap: _openGeminiConsole,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.4),
+                                            ),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
                                                 'Ambil Key',
-                                                style: AppTypography.caption.copyWith(
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                                style: AppTypography.caption
+                                                    .copyWith(
+                                                      color: AppColors.primary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                               ),
                                               const SizedBox(width: 4),
                                               const Icon(
@@ -745,69 +933,126 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
                                   ],
                                 ),
                                 const SizedBox(height: 6),
-                                Text('Kunci penglihatan AI untuk Scan Struk (aistudio.google.com)', style: AppTypography.caption),
+                                Text(
+                                  'Kunci penglihatan AI untuk Scan Struk (aistudio.google.com)',
+                                  style: AppTypography.caption,
+                                ),
                                 const SizedBox(height: 10),
                                 Showcase(
                                   key: ProductTourKeys.modalGeminiInput,
                                   title: '4. Tempel & Simpan Gemini Key',
-                                  description: 'Tempelkan kunci Gemini ke kolom ini lalu tekan Simpan.',
+                                  description:
+                                      'Tempelkan kunci Gemini ke kolom ini lalu tekan Simpan.',
                                   targetBorderRadius: BorderRadius.circular(14),
                                   targetPadding: const EdgeInsets.all(2),
-                                  tooltipBackgroundColor: const Color(0xE61A1A2E),
-                                  titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                  descTextStyle: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.4),
+                                  tooltipBackgroundColor: const Color(
+                                    0xE61A1A2E,
+                                  ),
+                                  titleTextStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                  descTextStyle: const TextStyle(
+                                    color: Color(0xD9FFFFFF),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                  ),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: TextField(
                                           controller: _geminiController,
                                           obscureText: _obscureGemini,
-                                          style: TextStyle(color: colors.textPrimary, fontSize: 13),
+                                          style: TextStyle(
+                                            color: colors.textPrimary,
+                                            fontSize: 13,
+                                          ),
                                           onChanged: (val) {
-                                            if (_isGeminiSaved) setState(() => _isGeminiSaved = false);
+                                            if (_isGeminiSaved) {
+                                              setState(
+                                                () => _isGeminiSaved = false,
+                                              );
+                                            }
                                           },
                                           decoration: InputDecoration(
                                             hintText: 'AIzaSy... atau AQ....',
-                                            hintStyle: TextStyle(color: colors.textMuted.withValues(alpha: 0.5)),
+                                            hintStyle: TextStyle(
+                                              color: colors.textMuted
+                                                  .withValues(alpha: 0.5),
+                                            ),
                                             filled: true,
                                             fillColor: colors.background,
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 10,
+                                                ),
                                             suffixIcon: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                if (_geminiController.text.isNotEmpty)
+                                                if (_geminiController
+                                                    .text
+                                                    .isNotEmpty)
                                                   IconButton(
-                                                    icon: Icon(Icons.clear_rounded, size: 16, color: colors.textMuted),
+                                                    icon: Icon(
+                                                      Icons.clear_rounded,
+                                                      size: 16,
+                                                      color: colors.textMuted,
+                                                    ),
                                                     onPressed: _clearGeminiKey,
                                                   ),
                                                 IconButton(
                                                   icon: Icon(
-                                                    _obscureGemini ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                                    _obscureGemini
+                                                        ? Icons
+                                                              .visibility_off_rounded
+                                                        : Icons
+                                                              .visibility_rounded,
                                                     size: 18,
                                                     color: colors.textSecondary,
                                                   ),
-                                                  onPressed: () => setState(() => _obscureGemini = !_obscureGemini),
+                                                  onPressed: () => setState(
+                                                    () => _obscureGemini =
+                                                        !_obscureGemini,
+                                                  ),
                                                 ),
                                               ],
                                             ),
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: BorderSide(color: colors.glassBorder),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide(
+                                                color: colors.glassBorder,
+                                              ),
                                             ),
                                             focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: const BorderSide(color: AppColors.primary),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: const BorderSide(
+                                                color: AppColors.primary,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
                                       GlassButton(
-                                        label: _isTestingGemini ? '...' : (_isGeminiSaved ? 'Tersimpan' : 'Simpan'),
-                                        variant: _isGeminiSaved ? GlassButtonVariant.income : GlassButtonVariant.warning,
+                                        label: _isTestingGemini
+                                            ? '...'
+                                            : (_isGeminiSaved
+                                                  ? 'Tersimpan'
+                                                  : 'Simpan'),
+                                        variant: _isGeminiSaved
+                                            ? GlassButtonVariant.income
+                                            : GlassButtonVariant.warning,
                                         width: 90,
                                         height: 42,
-                                        onPressed: _isTestingGemini ? null : () => _saveGeminiKey(_geminiController.text),
+                                        onPressed: _isTestingGemini
+                                            ? null
+                                            : () => _saveGeminiKey(
+                                                _geminiController.text,
+                                              ),
                                       ),
                                     ],
                                   ),
@@ -829,4 +1074,3 @@ class _AiKeySetupModalState extends State<AiKeySetupModal> with WidgetsBindingOb
     );
   }
 }
-

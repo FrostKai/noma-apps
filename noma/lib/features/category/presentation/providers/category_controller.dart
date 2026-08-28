@@ -9,9 +9,10 @@ final categoryRepositoryProvider = Provider<ICategoryRepository>((ref) {
   return CategoryRepository(db);
 });
 
-final categoryControllerProvider = StateNotifierProvider<CategoryController, AsyncValue<void>>((ref) {
-  return CategoryController(ref.watch(categoryRepositoryProvider));
-});
+final categoryControllerProvider =
+    StateNotifierProvider<CategoryController, AsyncValue<void>>((ref) {
+      return CategoryController(ref.watch(categoryRepositoryProvider));
+    });
 
 class CategoryController extends StateNotifier<AsyncValue<void>> {
   final ICategoryRepository _repo;
@@ -50,6 +51,26 @@ class CategoryController extends StateNotifier<AsyncValue<void>> {
       await _repo.deleteCategory(id);
       state = const AsyncData(null);
       return true;
+    } catch (e, stack) {
+      state = AsyncError(e, stack);
+      return false;
+    }
+  }
+
+  Future<bool> updateCategory({
+    required Category category,
+    required String name,
+    required String type,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final updated = category.copyWith(name: name, type: type);
+      final success = await _repo.updateCategory(
+        updated,
+        previousName: category.name,
+      );
+      state = const AsyncData(null);
+      return success;
     } catch (e, stack) {
       state = AsyncError(e, stack);
       return false;

@@ -6,7 +6,7 @@ import 'local_ai_engine.dart';
 
 class GeminiApiService {
   final Dio _dio;
-  static const String _groqTextModel = 'openai/gpt-oss-120b';
+  static const String groqTextModel = 'openai/gpt-oss-120b';
 
   static const List<String> _endpoints = [
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -397,7 +397,7 @@ Batasan wajib:
     final response = await _dio.post(
       'https://api.groq.com/openai/v1/chat/completions',
       data: {
-        'model': _groqTextModel,
+        'model': groqTextModel,
         'response_format': {'type': 'json_object'},
         'messages': [
           {'role': 'system', 'content': systemPrompt},
@@ -447,7 +447,7 @@ Batasan wajib:
 
     final response = await _dio.post(
       'https://api.groq.com/openai/v1/chat/completions',
-      data: {'model': _groqTextModel, 'messages': messages, 'temperature': 0.7},
+      data: {'model': groqTextModel, 'messages': messages, 'temperature': 0.7},
       options: Options(
         headers: {
           'Content-Type': 'application/json',
