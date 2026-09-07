@@ -63,7 +63,7 @@ class LocalAiEngine {
   }
 
   static int _extractAmount(String text) {
-    // Check for "juta" or "jt" e.g., 1.5 juta, 2jt, 5 juta
+    // 1. Check for "juta" or "jt" e.g., 1.5 juta, 2jt, 5 juta
     final jutaMatch = RegExp(
       r'(\d+(?:[\.,]\d+)?)\s*(?:juta|jt)',
     ).firstMatch(text);
@@ -75,7 +75,7 @@ class LocalAiEngine {
       }
     }
 
-    // Check for "rb" / "ribu" / "k" e.g., 35rb, 35k, 50 ribu
+    // 2. Check for "rb" / "ribu" / "k" e.g., 35rb, 35k, 50 ribu
     final ribuMatch = RegExp(
       r'(\d+(?:[\.,]\d+)?)\s*(?:ribu|rb|k\b)',
     ).firstMatch(text);
@@ -87,16 +87,52 @@ class LocalAiEngine {
       }
     }
 
-    // Check for standard numbers e.g., 35000, 150.000, 500,000, Rp 35.000
-    final numMatch = RegExp(
-      r'(?:rp\.?\s*)?(\d{1,3}(?:[\.,]\d{3})+|\d+)',
+    // 3. Check for explicit currency prefix e.g., Rp 35.000, rp50000
+    final rpMatch = RegExp(
+      r'rp\.?\s*(\d{1,3}(?:[\.,]\d{3})+|\d+)',
     ).firstMatch(text);
-    if (numMatch != null) {
-      final rawNum = numMatch.group(1)!.replaceAll('.', '').replaceAll(',', '');
+    if (rpMatch != null) {
+      final rawNum = rpMatch.group(1)!.replaceAll('.', '').replaceAll(',', '');
       final parsed = int.tryParse(rawNum);
       if (parsed != null && parsed > 0) {
         return parsed;
       }
+    }
+
+    // 4. Check for formatted numbers with thousand separators e.g., 150.000, 500,000
+    final formattedMatch = RegExp(
+      r'\b(\d{1,3}(?:[\.,]\d{3})+)\b',
+    ).firstMatch(text);
+    if (formattedMatch != null) {
+      final rawNum = formattedMatch.group(1)!.replaceAll('.', '').replaceAll(',', '');
+      final parsed = int.tryParse(rawNum);
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+
+    // 5. Collect all standalone numbers and prioritize monetary amounts over quantity
+    // e.g. in "makan siang 2 orang 50000", numbers are [2, 50000] -> pick 50000
+    final numberMatches = RegExp(r'\b\d+\b').allMatches(text);
+    final candidates = <int>[];
+    for (final m in numberMatches) {
+      final val = int.tryParse(m.group(0)!);
+      if (val != null && val > 0) {
+        candidates.add(val);
+      }
+    }
+
+    if (candidates.isNotEmpty) {
+      // If there are realistic money amounts (>= 500), filter out small quantities (< 100)
+      final moneyCandidates = candidates.where((val) => val >= 500).toList();
+      if (moneyCandidates.isNotEmpty) {
+        // Return the largest candidate representing total amount
+        moneyCandidates.sort();
+        return moneyCandidates.last;
+      }
+      // If all are small or single digits, return the largest
+      candidates.sort();
+      return candidates.last;
     }
 
     return 0; // Default fallback if no number found
