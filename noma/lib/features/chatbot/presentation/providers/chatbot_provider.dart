@@ -84,22 +84,31 @@ class ChatbotController extends StateNotifier<AsyncValue<void>> {
       now.year,
       now.month + 1,
     ).millisecondsSinceEpoch;
-    final totalIncome = await _sumTransactions(db, type: 'income');
-    final totalExpense = await _sumTransactions(db, type: 'expense');
-    final thisMonthIncome = await _sumTransactions(
-      db,
-      type: 'income',
-      startMs: monthStart,
-      endMs: nextMonthStart,
-    );
-    final thisMonthExpense = await _sumTransactions(
-      db,
-      type: 'expense',
-      startMs: monthStart,
-      endMs: nextMonthStart,
-    );
-    final sortedCategories = await _topExpenseCategories(db, limit: 5);
-    final recentTransactions = await _recentTransactions(db, limit: 5);
+    final results = await Future.wait([
+      _sumTransactions(db, type: 'income'),
+      _sumTransactions(db, type: 'expense'),
+      _sumTransactions(
+        db,
+        type: 'income',
+        startMs: monthStart,
+        endMs: nextMonthStart,
+      ),
+      _sumTransactions(
+        db,
+        type: 'expense',
+        startMs: monthStart,
+        endMs: nextMonthStart,
+      ),
+      _topExpenseCategories(db, limit: 5),
+      _recentTransactions(db, limit: 5),
+    ]);
+
+    final totalIncome = results[0] as double;
+    final totalExpense = results[1] as double;
+    final thisMonthIncome = results[2] as double;
+    final thisMonthExpense = results[3] as double;
+    final sortedCategories = results[4] as List<MapEntry<String, double>>;
+    final recentTransactions = results[5] as List<Transaction>;
     final balance = totalIncome - totalExpense;
 
     final catBuffer = StringBuffer();

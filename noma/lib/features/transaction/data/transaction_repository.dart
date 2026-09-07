@@ -541,15 +541,19 @@ class TransactionRepository implements ITransactionRepository {
 
   @override
   Stream<double> watchTotalBalance() {
-    return watchTotalIncome().asyncMap((income) async {
-      final query = _db.selectOnly(_db.transactions)
-        ..addColumns([_db.transactions.amount.sum()])
-        ..where(_db.transactions.type.equals('expense'));
-
-      final expenseRow = await query.getSingleOrNull();
-      final expense = expenseRow?.read(_db.transactions.amount.sum()) ?? 0.0;
-      return income - expense;
-    });
+    return _db
+        .customSelect(
+          '''
+          SELECT COALESCE(
+            SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END),
+            0.0
+          ) AS balance
+          FROM transactions
+          ''',
+          readsFrom: {_db.transactions},
+        )
+        .watchSingle()
+        .map((row) => (row.data['balance'] as num?)?.toDouble() ?? 0.0);
   }
 
   @override
