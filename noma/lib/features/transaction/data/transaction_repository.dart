@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 
 typedef TransactionItemInput = ({
@@ -9,6 +10,11 @@ typedef TransactionItemInput = ({
 });
 
 const int defaultTransactionPageSize = 50;
+
+typedef DeletedTransaction = ({
+  Transaction transaction,
+  List<TransactionItem> items,
+});
 
 class TransactionSummary {
   final int count;
@@ -115,6 +121,8 @@ abstract class ITransactionRepository {
     List<TransactionItemInput>? items,
   });
   Future<int> deleteTransaction(int id);
+  Future<DeletedTransaction?> deleteForUndo(int id);
+  Future<void> restoreDeleted(DeletedTransaction deleted);
 }
 
 class TransactionRepository implements ITransactionRepository {
@@ -560,7 +568,7 @@ class TransactionRepository implements ITransactionRepository {
     return _db.transaction(() async {
       final transactionId = await _db
           .into(_db.transactions)
-          .insert(transaction);
+          .insert(transaction.copyWith(externalId: Value(const Uuid().v4())));
       if (items.isNotEmpty) {
         await _insertTransactionItems(transactionId, items);
       }
@@ -644,4 +652,32 @@ class TransactionRepository implements ITransactionRepository {
       return (_db.delete(_db.transactions)..where((t) => t.id.equals(id))).go();
     });
   }
+
+  @override
+  Future<DeletedTransaction?> deleteForUndo(int id) =>
+      _db.transaction(() async {
+        final transaction = await (_db.select(
+          _db.transactions,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (transaction == null) return null;
+        final items = await getTransactionItems(id);
+        await deleteTransaction(id);
+        return (transaction: transaction, items: items);
+      });
+
+  @override
+  Future<void> restoreDeleted(DeletedTransaction deleted) =>
+      _db.transaction(() async {
+        await _db
+            .into(_db.transactions)
+            .insert(deleted.transaction.toCompanion(true));
+        if (deleted.items.isNotEmpty) {
+          await _db.batch(
+            (batch) => batch.insertAll(
+              _db.transactionItems,
+              deleted.items.map((item) => item.toCompanion(true)).toList(),
+            ),
+          );
+        }
+      });
 }

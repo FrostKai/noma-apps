@@ -13,10 +13,6 @@ class ProductTourKeys {
   static GlobalKey settingsAiKey = GlobalKey(
     debugLabel: 'tour_settings_ai_key',
   );
-  static GlobalKey modalGroqBtn = GlobalKey(debugLabel: 'tour_modal_groq_btn');
-  static GlobalKey modalGroqInput = GlobalKey(
-    debugLabel: 'tour_modal_groq_input',
-  );
   static GlobalKey modalGeminiBtn = GlobalKey(
     debugLabel: 'tour_modal_gemini_btn',
   );
@@ -47,8 +43,6 @@ class ProductTourKeys {
     balanceCard = GlobalKey(debugLabel: 'tour_balance_card');
     navPengaturan = GlobalKey(debugLabel: 'tour_nav_pengaturan');
     settingsAiKey = GlobalKey(debugLabel: 'tour_settings_ai_key');
-    modalGroqBtn = GlobalKey(debugLabel: 'tour_modal_groq_btn');
-    modalGroqInput = GlobalKey(debugLabel: 'tour_modal_groq_input');
     modalGeminiBtn = GlobalKey(debugLabel: 'tour_modal_gemini_btn');
     modalGeminiInput = GlobalKey(debugLabel: 'tour_modal_gemini_input');
     settingsCategory = GlobalKey(debugLabel: 'tour_settings_category');
@@ -67,10 +61,8 @@ class ProductTourKeys {
     balanceCard, // Step 1
     navPengaturan, // Step 2
     settingsAiKey, // Step 3
-    modalGroqBtn, // Step 4  (modal terbuka di step ini)
-    modalGroqInput, // Step 5
-    modalGeminiBtn, // Step 6
-    modalGeminiInput, // Step 7
+    modalGeminiBtn, // Step 4  (modal terbuka di step ini)
+    modalGeminiInput, // Step 5
     settingsCategory, // Step 8  (modal ditutup di step ini)
     settingsNotification, // Step 9
     navBeranda, // Step 10

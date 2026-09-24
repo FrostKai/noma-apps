@@ -10,4 +10,5 @@ class AppRoutes {
   static const String report = '/report';
   static const String settings = '/settings';
   static const String categories = '/categories';
+  static const String dataBackup = '/data-backup';
 }

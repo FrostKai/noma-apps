@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
 // Conditional import: use native.dart on Android/iOS/Desktop, web.dart on web
 import 'connection/unsupported.dart'
@@ -14,6 +15,7 @@ part 'app_database.g.dart';
 @DataClassName('Transaction')
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get externalId => text().nullable()();
   TextColumn get type => text()(); // 'income' | 'expense'
   RealColumn get amount => real()();
   TextColumn get category => text()();
@@ -85,13 +87,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
       await _createPerformanceIndexes();
+      await _createExternalIdIndex();
       await _seedDefaultCategories();
     },
     onUpgrade: (m, from, to) async {
@@ -100,6 +103,18 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await _createPerformanceIndexes();
+      }
+      if (from < 4) {
+        await m.addColumn(transactions, transactions.externalId);
+        final rows = await customSelect('SELECT id FROM transactions').get();
+        const uuid = Uuid();
+        for (final row in rows) {
+          await customStatement(
+            'UPDATE transactions SET external_id = ? WHERE id = ?',
+            [uuid.v4(), row.read<int>('id')],
+          );
+        }
+        await _createExternalIdIndex();
       }
     },
   );
@@ -122,6 +137,11 @@ class AppDatabase extends _$AppDatabase {
       'ON transaction_items(transaction_id);',
     );
   }
+
+  Future<void> _createExternalIdIndex() => customStatement(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_external_id '
+    'ON transactions(external_id);',
+  );
 
   Future<void> _seedDefaultCategories() async {
     final now = DateTime.now().millisecondsSinceEpoch;

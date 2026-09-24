@@ -22,6 +22,17 @@ class $TransactionsTable extends Transactions
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
+  static const VerificationMeta _externalIdMeta = const VerificationMeta(
+    'externalId',
+  );
+  @override
+  late final GeneratedColumn<String> externalId = GeneratedColumn<String>(
+    'external_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -129,6 +140,7 @@ class $TransactionsTable extends Transactions
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    externalId,
     type,
     amount,
     category,
@@ -154,6 +166,12 @@ class $TransactionsTable extends Transactions
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('external_id')) {
+      context.handle(
+        _externalIdMeta,
+        externalId.isAcceptableOrUnknown(data['external_id']!, _externalIdMeta),
+      );
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -254,6 +272,10 @@ class $TransactionsTable extends Transactions
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      externalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_id'],
+      ),
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
@@ -305,6 +327,7 @@ class $TransactionsTable extends Transactions
 
 class Transaction extends DataClass implements Insertable<Transaction> {
   final int id;
+  final String? externalId;
   final String type;
   final double amount;
   final String category;
@@ -317,6 +340,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final int updatedAt;
   const Transaction({
     required this.id,
+    this.externalId,
     required this.type,
     required this.amount,
     required this.category,
@@ -332,6 +356,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || externalId != null) {
+      map['external_id'] = Variable<String>(externalId);
+    }
     map['type'] = Variable<String>(type);
     map['amount'] = Variable<double>(amount);
     map['category'] = Variable<String>(category);
@@ -354,6 +381,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   TransactionsCompanion toCompanion(bool nullToAbsent) {
     return TransactionsCompanion(
       id: Value(id),
+      externalId: externalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(externalId),
       type: Value(type),
       amount: Value(amount),
       category: Value(category),
@@ -380,6 +410,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Transaction(
       id: serializer.fromJson<int>(json['id']),
+      externalId: serializer.fromJson<String?>(json['externalId']),
       type: serializer.fromJson<String>(json['type']),
       amount: serializer.fromJson<double>(json['amount']),
       category: serializer.fromJson<String>(json['category']),
@@ -397,6 +428,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'externalId': serializer.toJson<String?>(externalId),
       'type': serializer.toJson<String>(type),
       'amount': serializer.toJson<double>(amount),
       'category': serializer.toJson<String>(category),
@@ -412,6 +444,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
 
   Transaction copyWith({
     int? id,
+    Value<String?> externalId = const Value.absent(),
     String? type,
     double? amount,
     String? category,
@@ -424,6 +457,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     int? updatedAt,
   }) => Transaction(
     id: id ?? this.id,
+    externalId: externalId.present ? externalId.value : this.externalId,
     type: type ?? this.type,
     amount: amount ?? this.amount,
     category: category ?? this.category,
@@ -442,6 +476,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   Transaction copyWithCompanion(TransactionsCompanion data) {
     return Transaction(
       id: data.id.present ? data.id.value : this.id,
+      externalId: data.externalId.present
+          ? data.externalId.value
+          : this.externalId,
       type: data.type.present ? data.type.value : this.type,
       amount: data.amount.present ? data.amount.value : this.amount,
       category: data.category.present ? data.category.value : this.category,
@@ -467,6 +504,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   String toString() {
     return (StringBuffer('Transaction(')
           ..write('id: $id, ')
+          ..write('externalId: $externalId, ')
           ..write('type: $type, ')
           ..write('amount: $amount, ')
           ..write('category: $category, ')
@@ -484,6 +522,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   @override
   int get hashCode => Object.hash(
     id,
+    externalId,
     type,
     amount,
     category,
@@ -500,6 +539,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       identical(this, other) ||
       (other is Transaction &&
           other.id == this.id &&
+          other.externalId == this.externalId &&
           other.type == this.type &&
           other.amount == this.amount &&
           other.category == this.category &&
@@ -514,6 +554,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
 
 class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<int> id;
+  final Value<String?> externalId;
   final Value<String> type;
   final Value<double> amount;
   final Value<String> category;
@@ -526,6 +567,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<int> updatedAt;
   const TransactionsCompanion({
     this.id = const Value.absent(),
+    this.externalId = const Value.absent(),
     this.type = const Value.absent(),
     this.amount = const Value.absent(),
     this.category = const Value.absent(),
@@ -539,6 +581,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   });
   TransactionsCompanion.insert({
     this.id = const Value.absent(),
+    this.externalId = const Value.absent(),
     required String type,
     required double amount,
     required String category,
@@ -558,6 +601,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
        updatedAt = Value(updatedAt);
   static Insertable<Transaction> custom({
     Expression<int>? id,
+    Expression<String>? externalId,
     Expression<String>? type,
     Expression<double>? amount,
     Expression<String>? category,
@@ -571,6 +615,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (externalId != null) 'external_id': externalId,
       if (type != null) 'type': type,
       if (amount != null) 'amount': amount,
       if (category != null) 'category': category,
@@ -586,6 +631,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
 
   TransactionsCompanion copyWith({
     Value<int>? id,
+    Value<String?>? externalId,
     Value<String>? type,
     Value<double>? amount,
     Value<String>? category,
@@ -599,6 +645,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   }) {
     return TransactionsCompanion(
       id: id ?? this.id,
+      externalId: externalId ?? this.externalId,
       type: type ?? this.type,
       amount: amount ?? this.amount,
       category: category ?? this.category,
@@ -617,6 +664,9 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (externalId.present) {
+      map['external_id'] = Variable<String>(externalId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -655,6 +705,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   String toString() {
     return (StringBuffer('TransactionsCompanion(')
           ..write('id: $id, ')
+          ..write('externalId: $externalId, ')
           ..write('type: $type, ')
           ..write('amount: $amount, ')
           ..write('category: $category, ')
@@ -936,7 +987,6 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
     );
   }
-
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
@@ -968,6 +1018,21 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     totalPrice: totalPrice ?? this.totalPrice,
     createdAt: createdAt ?? this.createdAt,
   );
+  TransactionItem copyWithCompanion(TransactionItemsCompanion data) {
+    return TransactionItem(
+      id: data.id.present ? data.id.value : this.id,
+      transactionId: data.transactionId.present
+          ? data.transactionId.value
+          : this.transactionId,
+      name: data.name.present ? data.name.value : this.name,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
+      totalPrice: data.totalPrice.present
+          ? data.totalPrice.value
+          : this.totalPrice,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
 
   @override
   String toString() {
@@ -982,6 +1047,28 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
           ..write(')'))
         .toString();
   }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    transactionId,
+    name,
+    quantity,
+    unitPrice,
+    totalPrice,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransactionItem &&
+          other.id == this.id &&
+          other.transactionId == this.transactionId &&
+          other.name == this.name &&
+          other.quantity == this.quantity &&
+          other.unitPrice == this.unitPrice &&
+          other.totalPrice == this.totalPrice &&
+          other.createdAt == this.createdAt);
 }
 
 class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
@@ -1033,6 +1120,26 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     });
   }
 
+  TransactionItemsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? transactionId,
+    Value<String>? name,
+    Value<double>? quantity,
+    Value<double?>? unitPrice,
+    Value<double>? totalPrice,
+    Value<int>? createdAt,
+  }) {
+    return TransactionItemsCompanion(
+      id: id ?? this.id,
+      transactionId: transactionId ?? this.transactionId,
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
+      totalPrice: totalPrice ?? this.totalPrice,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1058,6 +1165,20 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       map['created_at'] = Variable<int>(createdAt.value);
     }
     return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransactionItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('transactionId: $transactionId, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitPrice: $unitPrice, ')
+          ..write('totalPrice: $totalPrice, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
   }
 }
 
@@ -2038,11 +2159,22 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     chatMessages,
     appSettings,
   ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'transactions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('transaction_items', kind: UpdateKind.delete)],
+    ),
+  ]);
 }
 
 typedef $$TransactionsTableCreateCompanionBuilder =
     TransactionsCompanion Function({
       Value<int> id,
+      Value<String?> externalId,
       required String type,
       required double amount,
       required String category,
@@ -2057,6 +2189,7 @@ typedef $$TransactionsTableCreateCompanionBuilder =
 typedef $$TransactionsTableUpdateCompanionBuilder =
     TransactionsCompanion Function({
       Value<int> id,
+      Value<String?> externalId,
       Value<String> type,
       Value<double> amount,
       Value<String> category,
@@ -2069,6 +2202,34 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<int> updatedAt,
     });
 
+final class $$TransactionsTableReferences
+    extends BaseReferences<_$AppDatabase, $TransactionsTable, Transaction> {
+  $$TransactionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$TransactionItemsTable, List<TransactionItem>>
+  _transactionItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.transactionItems,
+    aliasName: $_aliasNameGenerator(
+      db.transactions.id,
+      db.transactionItems.transactionId,
+    ),
+  );
+
+  $$TransactionItemsTableProcessedTableManager get transactionItemsRefs {
+    final manager = $$TransactionItemsTableTableManager(
+      $_db,
+      $_db.transactionItems,
+    ).filter((f) => f.transactionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _transactionItemsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
 class $$TransactionsTableFilterComposer
     extends Composer<_$AppDatabase, $TransactionsTable> {
   $$TransactionsTableFilterComposer({
@@ -2080,6 +2241,11 @@ class $$TransactionsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalId => $composableBuilder(
+    column: $table.externalId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2132,6 +2298,31 @@ class $$TransactionsTableFilterComposer
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> transactionItemsRefs(
+    Expression<bool> Function($$TransactionItemsTableFilterComposer f) f,
+  ) {
+    final $$TransactionItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.transactionItems,
+      getReferencedColumn: (t) => t.transactionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.transactionItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$TransactionsTableOrderingComposer
@@ -2145,6 +2336,11 @@ class $$TransactionsTableOrderingComposer
   });
   ColumnOrderings<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalId => $composableBuilder(
+    column: $table.externalId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -2211,6 +2407,11 @@ class $$TransactionsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
 
@@ -2248,6 +2449,31 @@ class $$TransactionsTableAnnotationComposer
 
   GeneratedColumn<int> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> transactionItemsRefs<T extends Object>(
+    Expression<T> Function($$TransactionItemsTableAnnotationComposer a) f,
+  ) {
+    final $$TransactionItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.transactionItems,
+      getReferencedColumn: (t) => t.transactionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.transactionItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$TransactionsTableTableManager
@@ -2261,12 +2487,9 @@ class $$TransactionsTableTableManager
           $$TransactionsTableAnnotationComposer,
           $$TransactionsTableCreateCompanionBuilder,
           $$TransactionsTableUpdateCompanionBuilder,
-          (
-            Transaction,
-            BaseReferences<_$AppDatabase, $TransactionsTable, Transaction>,
-          ),
+          (Transaction, $$TransactionsTableReferences),
           Transaction,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool transactionItemsRefs})
         > {
   $$TransactionsTableTableManager(_$AppDatabase db, $TransactionsTable table)
     : super(
@@ -2282,6 +2505,7 @@ class $$TransactionsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<String?> externalId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<double> amount = const Value.absent(),
                 Value<String> category = const Value.absent(),
@@ -2294,6 +2518,7 @@ class $$TransactionsTableTableManager
                 Value<int> updatedAt = const Value.absent(),
               }) => TransactionsCompanion(
                 id: id,
+                externalId: externalId,
                 type: type,
                 amount: amount,
                 category: category,
@@ -2308,6 +2533,7 @@ class $$TransactionsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<String?> externalId = const Value.absent(),
                 required String type,
                 required double amount,
                 required String category,
@@ -2320,6 +2546,7 @@ class $$TransactionsTableTableManager
                 required int updatedAt,
               }) => TransactionsCompanion.insert(
                 id: id,
+                externalId: externalId,
                 type: type,
                 amount: amount,
                 category: category,
@@ -2332,9 +2559,47 @@ class $$TransactionsTableTableManager
                 updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TransactionsTableReferences(db, table, e),
+                ),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({transactionItemsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (transactionItemsRefs) db.transactionItems,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (transactionItemsRefs)
+                    await $_getPrefetchedData<
+                      Transaction,
+                      $TransactionsTable,
+                      TransactionItem
+                    >(
+                      currentTable: table,
+                      referencedTable: $$TransactionsTableReferences
+                          ._transactionItemsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$TransactionsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).transactionItemsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.transactionId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -2349,12 +2614,374 @@ typedef $$TransactionsTableProcessedTableManager =
       $$TransactionsTableAnnotationComposer,
       $$TransactionsTableCreateCompanionBuilder,
       $$TransactionsTableUpdateCompanionBuilder,
-      (
-        Transaction,
-        BaseReferences<_$AppDatabase, $TransactionsTable, Transaction>,
-      ),
+      (Transaction, $$TransactionsTableReferences),
       Transaction,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool transactionItemsRefs})
+    >;
+typedef $$TransactionItemsTableCreateCompanionBuilder =
+    TransactionItemsCompanion Function({
+      Value<int> id,
+      required int transactionId,
+      required String name,
+      Value<double> quantity,
+      Value<double?> unitPrice,
+      required double totalPrice,
+      required int createdAt,
+    });
+typedef $$TransactionItemsTableUpdateCompanionBuilder =
+    TransactionItemsCompanion Function({
+      Value<int> id,
+      Value<int> transactionId,
+      Value<String> name,
+      Value<double> quantity,
+      Value<double?> unitPrice,
+      Value<double> totalPrice,
+      Value<int> createdAt,
+    });
+
+final class $$TransactionItemsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $TransactionItemsTable, TransactionItem> {
+  $$TransactionItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $TransactionsTable _transactionIdTable(_$AppDatabase db) =>
+      db.transactions.createAlias(
+        $_aliasNameGenerator(
+          db.transactionItems.transactionId,
+          db.transactions.id,
+        ),
+      );
+
+  $$TransactionsTableProcessedTableManager get transactionId {
+    final $_column = $_itemColumn<int>('transaction_id')!;
+
+    final manager = $$TransactionsTableTableManager(
+      $_db,
+      $_db.transactions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_transactionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TransactionItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $TransactionItemsTable> {
+  $$TransactionItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get unitPrice => $composableBuilder(
+    column: $table.unitPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get totalPrice => $composableBuilder(
+    column: $table.totalPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$TransactionsTableFilterComposer get transactionId {
+    final $$TransactionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.transactionId,
+      referencedTable: $db.transactions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionsTableFilterComposer(
+            $db: $db,
+            $table: $db.transactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TransactionItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TransactionItemsTable> {
+  $$TransactionItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get unitPrice => $composableBuilder(
+    column: $table.unitPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get totalPrice => $composableBuilder(
+    column: $table.totalPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$TransactionsTableOrderingComposer get transactionId {
+    final $$TransactionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.transactionId,
+      referencedTable: $db.transactions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.transactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TransactionItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TransactionItemsTable> {
+  $$TransactionItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<double> get unitPrice =>
+      $composableBuilder(column: $table.unitPrice, builder: (column) => column);
+
+  GeneratedColumn<double> get totalPrice => $composableBuilder(
+    column: $table.totalPrice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$TransactionsTableAnnotationComposer get transactionId {
+    final $$TransactionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.transactionId,
+      referencedTable: $db.transactions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.transactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TransactionItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TransactionItemsTable,
+          TransactionItem,
+          $$TransactionItemsTableFilterComposer,
+          $$TransactionItemsTableOrderingComposer,
+          $$TransactionItemsTableAnnotationComposer,
+          $$TransactionItemsTableCreateCompanionBuilder,
+          $$TransactionItemsTableUpdateCompanionBuilder,
+          (TransactionItem, $$TransactionItemsTableReferences),
+          TransactionItem,
+          PrefetchHooks Function({bool transactionId})
+        > {
+  $$TransactionItemsTableTableManager(
+    _$AppDatabase db,
+    $TransactionItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransactionItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransactionItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransactionItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> transactionId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<double?> unitPrice = const Value.absent(),
+                Value<double> totalPrice = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+              }) => TransactionItemsCompanion(
+                id: id,
+                transactionId: transactionId,
+                name: name,
+                quantity: quantity,
+                unitPrice: unitPrice,
+                totalPrice: totalPrice,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int transactionId,
+                required String name,
+                Value<double> quantity = const Value.absent(),
+                Value<double?> unitPrice = const Value.absent(),
+                required double totalPrice,
+                required int createdAt,
+              }) => TransactionItemsCompanion.insert(
+                id: id,
+                transactionId: transactionId,
+                name: name,
+                quantity: quantity,
+                unitPrice: unitPrice,
+                totalPrice: totalPrice,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TransactionItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({transactionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (transactionId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.transactionId,
+                                referencedTable:
+                                    $$TransactionItemsTableReferences
+                                        ._transactionIdTable(db),
+                                referencedColumn:
+                                    $$TransactionItemsTableReferences
+                                        ._transactionIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TransactionItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TransactionItemsTable,
+      TransactionItem,
+      $$TransactionItemsTableFilterComposer,
+      $$TransactionItemsTableOrderingComposer,
+      $$TransactionItemsTableAnnotationComposer,
+      $$TransactionItemsTableCreateCompanionBuilder,
+      $$TransactionItemsTableUpdateCompanionBuilder,
+      (TransactionItem, $$TransactionItemsTableReferences),
+      TransactionItem,
+      PrefetchHooks Function({bool transactionId})
     >;
 typedef $$CategoriesTableCreateCompanionBuilder =
     CategoriesCompanion Function({
@@ -2902,6 +3529,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$TransactionsTableTableManager get transactions =>
       $$TransactionsTableTableManager(_db, _db.transactions);
+  $$TransactionItemsTableTableManager get transactionItems =>
+      $$TransactionItemsTableTableManager(_db, _db.transactionItems);
   $$CategoriesTableTableManager get categories =>
       $$CategoriesTableTableManager(_db, _db.categories);
   $$ChatMessagesTableTableManager get chatMessages =>

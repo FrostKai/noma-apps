@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 const _source = 'dummy';
-const _androidPackage = 'com.example.noma';
+const _androidPackage = 'com.noma.app';
 const _androidDbPath = 'app_flutter/noma_app.db';
 
 Future<void> main(List<String> args) async {

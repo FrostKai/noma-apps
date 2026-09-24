@@ -198,14 +198,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
       ),
       onComplete: (index, key) {
         // Saat Step 3 (settingsAiKey) selesai (user klik Berikutnya),
-        // Buka modal OverlayEntry & tunggu 300ms agar modal ter-render, lalu lanjutkan tour ke modalGroqBtn
+        // Buka modal OverlayEntry & tunggu 300ms agar modal ter-render.
         if (key == ProductTourKeys.settingsAiKey) {
           AiKeySetupModal.show(context);
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted && _showcaseContext != null) {
               ShowcaseView.get().startShowCase([
-                ProductTourKeys.modalGroqBtn,
-                ProductTourKeys.modalGroqInput,
                 ProductTourKeys.modalGeminiBtn,
                 ProductTourKeys.modalGeminiInput,
                 ProductTourKeys.settingsCategory,
@@ -235,7 +233,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
           _onTabTapped(3);
         }
         // Step 4: Modal terbuka (dimulai dari onComplete step 3)
-        else if (key == ProductTourKeys.modalGroqBtn) {
+        else if (key == ProductTourKeys.modalGeminiBtn) {
           if (_isFabExpanded) _toggleFab();
           _onTabTapped(3);
           AiKeySetupModal.show(context);

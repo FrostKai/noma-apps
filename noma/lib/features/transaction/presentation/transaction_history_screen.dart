@@ -439,10 +439,11 @@ class _TransactionHistorySliver extends ConsumerWidget {
               );
 
               if (confirm == true) {
-                final success = await ref
+                final deleted = await ref
                     .read(transactionControllerProvider.notifier)
-                    .deleteTransaction(tx.id);
-                if (success) {
+                    .deleteForUndo(tx.id);
+                if (!context.mounted) return;
+                if (deleted != null) {
                   ref
                       .read(
                         transactionHistoryControllerProvider(
@@ -450,6 +451,42 @@ class _TransactionHistorySliver extends ConsumerWidget {
                         ).notifier,
                       )
                       .removeTransaction(tx.id);
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: const Text('Transaksi dihapus'),
+                      duration: const Duration(seconds: 5),
+                      action: SnackBarAction(
+                        label: 'Urungkan',
+                        onPressed: () async {
+                          final restored = await ref
+                              .read(transactionControllerProvider.notifier)
+                              .restoreDeleted(deleted);
+                          if (!context.mounted) return;
+                          if (restored) {
+                            await ref
+                                .read(
+                                  transactionHistoryControllerProvider(
+                                    historyArgs,
+                                  ).notifier,
+                                )
+                                .loadInitial();
+                          } else {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Gagal memulihkan transaksi'),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Gagal menghapus transaksi')),
+                  );
                 }
               }
             },

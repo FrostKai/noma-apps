@@ -6,7 +6,6 @@ import 'local_ai_engine.dart';
 
 class GeminiApiService {
   final Dio _dio;
-  static const String groqTextModel = 'openai/gpt-oss-120b';
 
   static const List<String> _endpoints = [
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -30,27 +29,18 @@ class GeminiApiService {
           );
 
   Future<String> _getApiKey() async {
-    final rawKey = await ApiKeyService.getApiKey();
+    final rawKey = await ApiKeyService.getGeminiApiKey();
     final key = ApiKeyService.sanitizeKey(rawKey);
-    if (key.isEmpty ||
-        key == 'your_groq_api_key_here' ||
-        key == 'your_gemini_api_key_here') {
+    if (key.isEmpty || key == 'your_gemini_api_key_here') {
       throw Exception(
-        'API Key Groq belum diisi. Silakan dapatkan API Key gratis dari console.groq.com pada menu Pengaturan.',
+        'API Key Gemini belum diisi. Silakan masukkan Gemini API Key pada menu Pengaturan.',
       );
     }
     return key;
   }
 
   Future<String> _getGeminiVisionApiKey() async {
-    final rawKey = await ApiKeyService.getGeminiApiKey();
-    final key = ApiKeyService.sanitizeKey(rawKey);
-    if (key.isEmpty || key == 'your_gemini_api_key_here') {
-      throw Exception(
-        'API Key Gemini belum diisi. Silakan masukkan Gemini API Key pada menu Pengaturan untuk memakai Scan Struk.',
-      );
-    }
-    return key;
+    return _getApiKey();
   }
 
   String _extractDioErrorMessage(DioException e) {
@@ -80,12 +70,12 @@ class GeminiApiService {
               return 'API Key tidak valid ($msg). Silakan periksa atau ganti API Key Anda pada menu Pengaturan.';
             }
             if (msg.contains('User location is not supported')) {
-              return 'Lokasi/IP Anda tidak didukung oleh Groq AI. Coba gunakan jaringan internet lain.';
+              return 'Lokasi/IP Anda tidak didukung oleh Google AI. Coba gunakan jaringan internet lain.';
             }
             if (statusCode == 429 ||
                 msg.contains('Quota exceeded') ||
                 msg.contains('RESOURCE_EXHAUSTED')) {
-              return 'Batas kuota Groq API tercapai (429 Too Many Requests). Silakan tunggu beberapa saat atau gunakan API Key baru.';
+              return 'Batas kuota Gemini API tercapai (429 Too Many Requests). Silakan tunggu beberapa saat atau gunakan API Key baru.';
             }
             return msg;
           }
@@ -93,11 +83,11 @@ class GeminiApiService {
       } catch (_) {}
 
       if (statusCode == 400) {
-        return 'Format request atau API Key tidak sesuai (Status 400 Bad Request). Silakan periksa API Key Groq Anda.';
+        return 'Format request atau API Key tidak sesuai (Status 400 Bad Request). Silakan periksa API Key Gemini Anda.';
       } else if (statusCode == 403) {
-        return 'Akses ditolak oleh Groq Cloud API (Status 403 Forbidden). Silakan periksa API Key Anda.';
+        return 'Akses ditolak oleh Gemini API (Status 403 Forbidden). Silakan periksa API Key Anda.';
       } else if (statusCode == 429) {
-        return 'Kuota request Groq API habis untuk sementara (Status 429).';
+        return 'Kuota request Gemini API habis untuk sementara (Status 429).';
       }
     }
 
@@ -155,22 +145,6 @@ Catatan:
 
     try {
       final apiKey = await _getApiKey();
-      if (apiKey.startsWith('gsk_')) {
-        return await _callGroqJson(
-          apiKey: apiKey,
-          systemPrompt: systemPrompt,
-          userText: text,
-        );
-      }
-
-      if (apiKey.startsWith('sk-or')) {
-        return await _callOpenRouterJson(
-          apiKey: apiKey,
-          systemPrompt: systemPrompt,
-          userText: text,
-        );
-      }
-
       final response = await _postPayloadWithFallback(payload, apiKey);
 
       final candidates = response.data['candidates'] as List?;
@@ -195,7 +169,7 @@ Catatan:
     }
   }
 
-  /// 2. Scan Receipt Image using Gemini Vision / Groq Vision / OpenRouter Vision API
+  /// 2. Scan Receipt Image using Gemini Vision API
   Future<Map<String, dynamic>> scanReceiptImage(Uint8List imageBytes) async {
     const systemPrompt = '''
 Kamu adalah sistem ekstraksi struk belanja untuk aplikasi "Noma".
@@ -320,24 +294,6 @@ Batasan wajib:
 
     final apiKey = await _getApiKey();
 
-    if (apiKey.startsWith('gsk_')) {
-      return await _callGroqChat(
-        apiKey: apiKey,
-        systemPrompt: systemPrompt,
-        userMessage: userMessage,
-        conversationHistory: conversationHistory,
-      );
-    }
-
-    if (apiKey.startsWith('sk-or')) {
-      return await _callOpenRouterChat(
-        apiKey: apiKey,
-        systemPrompt: systemPrompt,
-        userMessage: userMessage,
-        conversationHistory: conversationHistory,
-      );
-    }
-
     final List<Map<String, dynamic>> contents = [];
 
     for (final msg in conversationHistory) {
@@ -387,164 +343,6 @@ Batasan wajib:
         financialContext: financialContext,
       );
     }
-  }
-
-  Future<Map<String, dynamic>> _callGroqJson({
-    required String apiKey,
-    required String systemPrompt,
-    required String userText,
-  }) async {
-    final response = await _dio.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      data: {
-        'model': groqTextModel,
-        'response_format': {'type': 'json_object'},
-        'messages': [
-          {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': userText},
-        ],
-        'temperature': 0.1,
-      },
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-      ),
-    );
-
-    final choices = response.data['choices'] as List?;
-    if (choices != null && choices.isNotEmpty) {
-      final messageObj = choices.first['message'];
-      if (messageObj != null && messageObj['content'] != null) {
-        final jsonString = _cleanJsonString(messageObj['content'] as String);
-        return jsonDecode(jsonString) as Map<String, dynamic>;
-      }
-    }
-    throw Exception('Gagal mendapatkan JSON dari Groq AI');
-  }
-
-  Future<String> _callGroqChat({
-    required String apiKey,
-    required String systemPrompt,
-    required String userMessage,
-    required List<Map<String, String>> conversationHistory,
-  }) async {
-    final List<Map<String, String>> messages = [
-      {'role': 'system', 'content': systemPrompt},
-    ];
-
-    for (final msg in conversationHistory) {
-      messages.add({
-        'role': msg['role'] == 'user' ? 'user' : 'assistant',
-        'content': msg['content']!,
-      });
-    }
-
-    if (messages.last['content'] != userMessage) {
-      messages.add({'role': 'user', 'content': userMessage});
-    }
-
-    final response = await _dio.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      data: {'model': groqTextModel, 'messages': messages, 'temperature': 0.7},
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-      ),
-    );
-
-    final choices = response.data['choices'] as List?;
-    if (choices != null && choices.isNotEmpty) {
-      final messageObj = choices.first['message'];
-      if (messageObj != null && messageObj['content'] != null) {
-        return messageObj['content'] as String;
-      }
-    }
-    return 'Maaf, Nomi sedang kesulitan memproses pesan saat ini.';
-  }
-
-  Future<Map<String, dynamic>> _callOpenRouterJson({
-    required String apiKey,
-    required String systemPrompt,
-    required String userText,
-  }) async {
-    final response = await _dio.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      data: {
-        'model': 'meta-llama/llama-3.3-70b-instruct:free',
-        'response_format': {'type': 'json_object'},
-        'messages': [
-          {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': userText},
-        ],
-        'temperature': 0.1,
-      },
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-      ),
-    );
-
-    final choices = response.data['choices'] as List?;
-    if (choices != null && choices.isNotEmpty) {
-      final messageObj = choices.first['message'];
-      if (messageObj != null && messageObj['content'] != null) {
-        final jsonString = _cleanJsonString(messageObj['content'] as String);
-        return jsonDecode(jsonString) as Map<String, dynamic>;
-      }
-    }
-    throw Exception('Gagal mendapatkan JSON dari OpenRouter AI');
-  }
-
-  Future<String> _callOpenRouterChat({
-    required String apiKey,
-    required String systemPrompt,
-    required String userMessage,
-    required List<Map<String, String>> conversationHistory,
-  }) async {
-    final List<Map<String, String>> messages = [
-      {'role': 'system', 'content': systemPrompt},
-    ];
-
-    for (final msg in conversationHistory) {
-      messages.add({
-        'role': msg['role'] == 'user' ? 'user' : 'assistant',
-        'content': msg['content']!,
-      });
-    }
-
-    if (messages.last['content'] != userMessage) {
-      messages.add({'role': 'user', 'content': userMessage});
-    }
-
-    final response = await _dio.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      data: {
-        'model': 'meta-llama/llama-3.3-70b-instruct:free',
-        'messages': messages,
-        'temperature': 0.7,
-      },
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-      ),
-    );
-
-    final choices = response.data['choices'] as List?;
-    if (choices != null && choices.isNotEmpty) {
-      final messageObj = choices.first['message'];
-      if (messageObj != null && messageObj['content'] != null) {
-        return messageObj['content'] as String;
-      }
-    }
-    return 'Maaf, Nomi sedang kesulitan memproses pesan saat ini.';
   }
 
   /// Posts payload with automatic model endpoint fallback chain & dual headers/query authentication

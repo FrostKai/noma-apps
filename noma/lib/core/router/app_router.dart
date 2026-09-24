@@ -8,6 +8,7 @@ import '../../features/chatbot/presentation/chatbot_screen.dart';
 import '../../features/report/presentation/report_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/category/presentation/category_screen.dart';
+import '../../features/settings/presentation/data_backup_screen.dart';
 
 import '../../features/main_shell/presentation/main_shell_screen.dart';
 
@@ -49,6 +50,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.categories,
       builder: (context, state) => const CategoryScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.dataBackup,
+      builder: (context, state) => const DataBackupScreen(),
     ),
   ],
 );

@@ -315,6 +315,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 16),
 
+          GlassCard(
+            onTap: () => context.push(AppRoutes.dataBackup),
+            child: Row(
+              children: [
+                const Icon(Icons.backup_outlined, color: AppColors.primary),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'Data & Backup',
+                    style: AppTypography.labelLarge.copyWith(
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: colors.textSecondary),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Daily Night Notification Section
           Text(
             'Notifikasi & Pengingat',
@@ -497,7 +517,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             key: ProductTourKeys.settingsAiKey,
             title: 'Setup API Key AI (100% Gratis)',
             description:
-                'Di sini tempat memasukkan Kunci AI (100% Gratis).\n\n'
+                'Di sini tempat memasukkan Gemini API Key.\n\n'
                 'Tekan "Berikutnya" untuk membuka jendela pengaturan dan panduan pengambilannya!',
             tooltipPosition: TooltipPosition.top,
             targetBorderRadius: BorderRadius.circular(20),
@@ -527,7 +547,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Groq Cloud AI',
+                          'Gemini AI',
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.textPrimary,
                           ),

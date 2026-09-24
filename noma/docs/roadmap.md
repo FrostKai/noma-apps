@@ -1,23 +1,5 @@
 # Roadmap Pengembangan Aplikasi Noma - Pencatatan Uang Berbasis AI
 
-## Status Roadmap Saat Ini - 7 Agustus 2026
-
-MVP utama sudah diimplementasikan di kode Flutter. Dokumen roadmap ini sekarang dipakai sebagai rujukan progres, bukan daftar task kosong. Status ringkas:
-
-- Fase 1 Foundation: selesai. Struktur Flutter, Riverpod, Drift, routing, tema, asset, dan seeding kategori sudah ada.
-- Fase 2 Core transaction: sebagian besar selesai. CRUD transaksi, kategori, dashboard, pencarian, dan filter sudah ada. Edit kategori kustom belum tersedia, baru tambah/hapus.
-- Fase 3 AI text dan receipt scanner: sebagian besar selesai. Parsing teks, scan struk, kamera/galeri, loading state, dan penyimpanan hasil sudah ada. Koreksi hasil scan sebelum simpan masih perlu ditingkatkan.
-- Fase 4 Chatbot dan notifikasi: sebagian selesai. Chatbot dan local notification scheduling sudah ada. `workmanager` belum dipakai dan tidak tercatat sebagai dependency aktif.
-- Fase 5 Laporan dan polish: sebagian besar selesai. Laporan bar/pie chart, filter periode sederhana, pengaturan API key/notifikasi, dan UI polish sudah ada. Release APK belum diverifikasi dalam dokumen ini.
-
-Prioritas teknis berikutnya:
-
-1. Perbaiki flow AI text agar hasil parsing disimpan sebagai transaksi baru, bukan update `id: 0`.
-2. Amankan `.env`: jangan bundle secret production ke asset Flutter, dan masukkan `.env` ke `.gitignore`.
-3. Perluas konteks chatbot dengan ringkasan periode, kategori terbesar, dan transaksi terbaru.
-4. Tambahkan form koreksi hasil scan struk sebelum simpan.
-5. Sinkronkan dokumentasi dependency: hapus klaim `workmanager` jika tidak dipakai, atau tambahkan implementasinya jika memang diperlukan.
-
 Aplikasi "Noma" adalah aplikasi pencatatan keuangan pribadi berbasis AI (Artificial Intelligence) untuk platform Android. Aplikasi ini dirancang untuk memudahkan pengguna dalam mencatat, melacak, dan menganalisis pengeluaran serta pemasukan menggunakan teknologi natural language processing dan computer vision.
 
 Dokumen ini merinci roadmap pengembangan untuk Minimum Viable Product (MVP) dengan kerangka waktu 5 minggu untuk solo developer.
@@ -30,7 +12,7 @@ Fokus pada minggu pertama adalah meletakkan fondasi teknis, struktur arsitektur 
 
 **Daftar Task:**
 - [ ] Inisialisasi proyek Flutter baru dengan nama `noma`.
-- [ ] Konfigurasi `pubspec.yaml` untuk menambahkan dependensi utama: `flutter_riverpod`, `drift`, `sqlite3_flutter_libs`, `dio`, `go_router`, `google_fonts`, `image_picker`, `flutter_local_notifications`, `workmanager`, `freezed`, `fl_chart`, `flutter_dotenv`.
+- [ ] Konfigurasi `pubspec.yaml` untuk menambahkan dependensi utama: `flutter_riverpod`, `drift`, `dio`, `go_router`, `google_fonts`, `image_picker`, `flutter_local_notifications`, `workmanager`.
 - [ ] Setup struktur folder proyek menggunakan prinsip Clean Architecture Lite (presentation, domain, data).
 - [ ] Implementasi Design System: Konfigurasi tema Dark Mode dan elemen Glassmorphism (warna, border radius, blur effect, typography).
 - [ ] Setup database lokal menggunakan Drift (SQLite).
@@ -41,7 +23,7 @@ Fokus pada minggu pertama adalah meletakkan fondasi teknis, struktur arsitektur 
 **Estimasi Effort:** Tinggi (3-4 hari)
 **Dependencies antar Task:** Inisialisasi proyek harus selesai sebelum konfigurasi dependensi. Setup struktur folder mendasari pembuatan file lainnya. Setup database harus dilakukan sebelum seeding.
 **Definition of Done (DoD):**
-- Proyek dapat di-build dan berjalan di emulator/device tanpa error.
+- Proyek dapat di-build dan berjalan di emulator/device tanpa eperbarror.
 - Tampilan dasar menunjukkan tema gelap dengan efek glassmorphism.
 - Database lokal berhasil diinisialisasi dan data kategori default tersimpan.
 - Navigasi dasar menggunakan `go_router` berfungsi.

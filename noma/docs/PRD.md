@@ -312,7 +312,9 @@ Target performa:
 ## 8. Batasan Saat Ini
 
 - OCR struk belum 100% offline.
-- Belum ada backup lokal/export file.
+- Backup JSON manual tersedia di Pengaturan > Data & Backup; file perlu disimpan pengguna di luar aplikasi.
+- Export laporan PDF dan XLSX mengikuti periode laporan aktif. XLSX dibatasi 10.000 transaksi per export.
+- Foto struk, API key, chat, dan preferensi aplikasi tidak termasuk backup JSON.
 - Belum ada cloud sync.
 - Belum ada multi-wallet.
 - Belum ada budget per kategori.
@@ -341,7 +343,8 @@ Mitigasi:
 
 Mitigasi:
 
-- Tambahkan fitur export/backup lokal pada fase berikutnya.
+- Buat backup JSON secara berkala dan simpan di luar perangkat; restore menggabungkan transaksi berdasarkan UUID tanpa menggandakan data.
+- Backup tidak otomatis dan foto struk belum ikut dipulihkan.
 
 ### Risiko: Histori besar membuat aplikasi lambat
 
@@ -357,10 +360,10 @@ Mitigasi:
 
 Prioritas berikutnya:
 
-1. Backup/export lokal.
-2. Budget bulanan per kategori.
-3. Detail transaksi struk yang lebih lengkap.
-4. Filter laporan custom range.
+1. Budget bulanan per kategori.
+2. Detail transaksi struk yang lebih lengkap.
+3. Filter laporan custom range.
+4. Backup foto struk opsional jika kebutuhan dan kapasitas perangkat memungkinkan.
 5. Optimasi tampilan list dengan lazy sliver jika dashboard mulai terasa berat.
 6. Backend proxy opsional untuk AI jika aplikasi dirilis publik.
 

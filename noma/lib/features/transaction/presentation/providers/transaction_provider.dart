@@ -273,4 +273,28 @@ class TransactionController extends StateNotifier<AsyncValue<void>> {
       return false;
     }
   }
+
+  Future<DeletedTransaction?> deleteForUndo(int id) async {
+    state = const AsyncLoading();
+    try {
+      final deleted = await _repo.deleteForUndo(id);
+      state = const AsyncData(null);
+      return deleted;
+    } catch (e, stack) {
+      state = AsyncError(e, stack);
+      return null;
+    }
+  }
+
+  Future<bool> restoreDeleted(DeletedTransaction deleted) async {
+    state = const AsyncLoading();
+    try {
+      await _repo.restoreDeleted(deleted);
+      state = const AsyncData(null);
+      return true;
+    } catch (e, stack) {
+      state = AsyncError(e, stack);
+      return false;
+    }
+  }
 }

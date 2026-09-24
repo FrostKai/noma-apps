@@ -231,7 +231,7 @@ class HomeScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Saldo Bersih',
+            'Saldo Total',
             style: AppTypography.labelMedium.copyWith(
               color: colors.textSecondary,
             ),
@@ -242,6 +242,11 @@ class HomeScreen extends ConsumerWidget {
             style: AppTypography.amountDisplay.copyWith(
               color: balance >= 0 ? colors.textPrimary : AppColors.expense,
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Seluruh transaksi',
+            style: AppTypography.caption.copyWith(color: colors.textSecondary),
           ),
         ],
       ),

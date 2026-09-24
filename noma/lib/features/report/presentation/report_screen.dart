@@ -1,6 +1,13 @@
+import 'dart:io';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../../core/services/report_export_service.dart';
+import '../../../shared/providers/database_provider.dart';
 import '../../../core/constants/app_color_scheme.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -19,6 +26,7 @@ class ReportScreen extends ConsumerStatefulWidget {
 class _ReportScreenState extends ConsumerState<ReportScreen> {
   int _touchedPieIndex = -1;
   String _selectedPeriod = 'this_month';
+  bool _exporting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +37,15 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
+        actions: [
+          IconButton(
+            tooltip: 'Export laporan',
+            onPressed: _exporting || reportAsync.valueOrNull == null
+                ? null
+                : () => _showExportOptions(reportAsync.valueOrNull!),
+            icon: const Icon(Icons.ios_share_rounded),
+          ),
+        ],
         title: Text(
           'Laporan & Statistik',
           style: AppTypography.headingMedium.copyWith(
@@ -213,6 +230,71 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showExportOptions(ReportData report) async {
+    final format = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Export PDF'),
+              onTap: () => Navigator.pop(context, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Export Excel'),
+              onTap: () => Navigator.pop(context, 'xlsx'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (format == null || !mounted) return;
+    setState(() => _exporting = true);
+    try {
+      final range = _selectedRange();
+      final service = ReportExportService(ref.read(databaseProvider));
+      final name =
+          'noma-laporan-${DateTime.now().millisecondsSinceEpoch}.$format';
+      final file = File(p.join((await getTemporaryDirectory()).path, name));
+      if (format == 'pdf') {
+        const labels = {
+          'this_month': 'Bulan Ini',
+          'last_month': 'Bulan Lalu',
+          'three_months': '3 Bulan',
+          'six_months': '6 Bulan',
+          'this_year': 'Tahun Ini',
+          'all': 'Semua Waktu',
+        };
+        await service.exportPdf(file, labels[_selectedPeriod]!, report);
+      } else {
+        await service.exportExcel(
+          file,
+          startMs: range.startMs,
+          endMs: range.endMs,
+          count: report.summary.count,
+        );
+      }
+      await Share.shareXFiles([XFile(file.path)], text: 'Laporan Noma');
+    } on FormatException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membuat laporan. Coba lagi.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   SummaryRangeArgs _selectedRange() {
